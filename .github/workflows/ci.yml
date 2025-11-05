@@ -23,3 +23,5 @@ jobs:
       - run: pnpm check
       - run: pnpm build
       - run: pnpm test
+        env:
+          FIRECRAWL_API_KEY: test
