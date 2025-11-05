@@ -200,7 +200,8 @@ Define your servers in `config/mcp-runtime.json` using the same shape Cursor and
 			"command": "bash",
 			"args": ["scripts/mcp_stdio_wrapper.sh", "env", "npx", "-y", "chrome-devtools-mcp@latest"]
 		}
-	}
+	},
+	"imports": ["cursor", "claude-code", "claude-desktop", "codex"]
 }
 ```
 
@@ -210,6 +211,8 @@ Fields you can use:
 - `command` + optional `args` for stdio servers.
 - Optional metadata such as `description`, `headers`, `env`, `auth`, `tokenCacheDir`, and `clientName`.
 - Convenience helpers `bearerToken` or `bearerTokenEnv` populate `Authorization` headers automatically.
+
+If you omit the optional `imports` array, `mcp-runtime` automatically merges Cursor, Claude Code, Claude Desktop, and Codex configs (first entry wins on conflicts). Set `"imports": []` to disable or provide a custom order such as `"imports": ["cursor", "codex"]`.
 
 Pass a different path via `createRuntime({ configPath })` when you need multiple configs side by side.
 

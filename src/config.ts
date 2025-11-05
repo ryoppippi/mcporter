@@ -2,10 +2,24 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { parse as parseToml } from "@iarna/toml";
 import { z } from "zod";
 import { expandHome } from "./env.js";
 
-// Raw shape of each MCP server as declared inside mcp-runtime.json.
+const ImportKindSchema = z.enum([
+	"cursor",
+	"claude-code",
+	"claude-desktop",
+	"codex",
+]);
+
+const DEFAULT_IMPORTS: ImportKind[] = [
+	"cursor",
+	"claude-code",
+	"claude-desktop",
+	"codex",
+];
+
 const RawEntrySchema = z.object({
 	description: z.string().optional(),
 	baseUrl: z.string().optional(),
@@ -31,6 +45,7 @@ const RawEntrySchema = z.object({
 
 const RawConfigSchema = z.object({
 	mcpServers: z.record(RawEntrySchema),
+	imports: z.array(ImportKindSchema).optional(),
 });
 
 export interface HttpCommand {
@@ -68,18 +83,47 @@ export async function loadServerDefinitions(
 ): Promise<ServerDefinition[]> {
 	const rootDir = options.rootDir ?? process.cwd();
 	const configPath = resolveConfigPath(options.configPath, rootDir);
-	const raw = await readConfigFile(configPath);
+	const config = await readConfigFile(configPath);
 	const baseDir = path.dirname(configPath);
 
+	const merged = new Map<string, { raw: RawEntry; baseDir: string }>();
+
+	const imports = config.imports ?? DEFAULT_IMPORTS;
+	for (const importKind of imports) {
+		const candidates = pathsForImport(importKind, rootDir);
+		for (const candidate of candidates) {
+			const resolved = expandHome(candidate);
+			const entries = await readExternalEntries(resolved);
+			if (!entries) {
+				continue;
+			}
+			for (const [name, rawEntry] of entries) {
+				if (merged.has(name)) {
+					continue;
+				}
+				merged.set(name, { raw: rawEntry, baseDir: path.dirname(resolved) });
+			}
+		}
+	}
+
+	for (const [name, entryRaw] of Object.entries(config.mcpServers)) {
+		const parsed = RawEntrySchema.parse(entryRaw);
+		merged.set(name, { raw: parsed, baseDir });
+	}
+
 	const servers: ServerDefinition[] = [];
-	for (const [name, entryRaw] of Object.entries(raw.mcpServers)) {
-		const entry = entryRaw ?? {};
-		const definition = normalizeServerEntry(name, entry, baseDir);
-		servers.push(definition);
+	for (const [name, { raw, baseDir: entryBaseDir }] of merged) {
+		servers.push(normalizeServerEntry(name, raw, entryBaseDir));
 	}
 
 	return servers;
 }
+
+type ImportKind = z.infer<typeof ImportKindSchema>;
+type RawEntry = z.infer<typeof RawEntrySchema>;
+type RawConfig = z.infer<typeof RawConfigSchema>;
+
+type RawEntryMap = Map<string, RawEntry>;
 
 function resolveConfigPath(
 	configPath: string | undefined,
@@ -91,16 +135,14 @@ function resolveConfigPath(
 	return path.resolve(rootDir, "config", "mcp-runtime.json");
 }
 
-async function readConfigFile(
-	configPath: string,
-): Promise<z.infer<typeof RawConfigSchema>> {
+async function readConfigFile(configPath: string): Promise<RawConfig> {
 	const buffer = await fs.readFile(configPath, "utf8");
 	return RawConfigSchema.parse(JSON.parse(buffer));
 }
 
 function normalizeServerEntry(
 	name: string,
-	raw: z.infer<typeof RawEntrySchema>,
+	raw: RawEntry,
 	baseDir: string,
 ): ServerDefinition {
 	const description = raw.description;
@@ -167,20 +209,19 @@ function normalizePath(input: string | undefined): string | undefined {
 	return expandHome(input);
 }
 
-function getUrl(raw: z.infer<typeof RawEntrySchema>): string | undefined {
+function getUrl(raw: RawEntry): string | undefined {
 	return (
 		raw.baseUrl ??
 		raw.base_url ??
 		raw.url ??
 		raw.serverUrl ??
 		raw.server_url ??
-		raw.base_url ??
 		undefined
 	);
 }
 
 function getCommand(
-	raw: z.infer<typeof RawEntrySchema>,
+	raw: RawEntry,
 ): { command: string; args: string[] } | undefined {
 	const commandValue = raw.command ?? raw.executable;
 	if (Array.isArray(commandValue)) {
@@ -196,9 +237,7 @@ function getCommand(
 	return undefined;
 }
 
-function buildHeaders(
-	raw: z.infer<typeof RawEntrySchema>,
-): Record<string, string> | undefined {
+function buildHeaders(raw: RawEntry): Record<string, string> | undefined {
 	const headers: Record<string, string> = {};
 
 	if (raw.headers) {
@@ -216,6 +255,246 @@ function buildHeaders(
 	}
 
 	return Object.keys(headers).length > 0 ? headers : undefined;
+}
+
+async function readExternalEntries(
+	filePath: string,
+): Promise<RawEntryMap | null> {
+	if (!(await fileExists(filePath))) {
+		return null;
+	}
+
+	if (filePath.endsWith(".toml")) {
+		const buffer = await fs.readFile(filePath, "utf8");
+		const parsed = parseToml(buffer) as Record<string, unknown>;
+		return extractFromCodexConfig(parsed);
+	}
+
+	const buffer = await fs.readFile(filePath, "utf8");
+	const parsed = JSON.parse(buffer) as unknown;
+	return extractFromMcpJson(parsed);
+}
+
+function extractFromMcpJson(raw: unknown): RawEntryMap {
+	const map = new Map<string, RawEntry>();
+	if (!raw || typeof raw !== "object") {
+		return map;
+	}
+
+	const container =
+		"mcpServers" in raw && raw.mcpServers && typeof raw.mcpServers === "object"
+			? (raw.mcpServers as Record<string, unknown>)
+			: (raw as Record<string, unknown>);
+
+	for (const [name, value] of Object.entries(container)) {
+		if (!value || typeof value !== "object") {
+			continue;
+		}
+		const entry = convertExternalEntry(value as Record<string, unknown>);
+		if (entry) {
+			map.set(name, entry);
+		}
+	}
+
+	return map;
+}
+
+function extractFromCodexConfig(raw: Record<string, unknown>): RawEntryMap {
+	const map = new Map<string, RawEntry>();
+	const serversRaw = raw.mcp_servers;
+	if (!serversRaw || typeof serversRaw !== "object") {
+		return map;
+	}
+
+	for (const [name, value] of Object.entries(
+		serversRaw as Record<string, unknown>,
+	)) {
+		if (!value || typeof value !== "object") {
+			continue;
+		}
+		const entry = convertExternalEntry(value as Record<string, unknown>);
+		if (entry) {
+			map.set(name, entry);
+		}
+	}
+
+	return map;
+}
+
+function convertExternalEntry(value: Record<string, unknown>): RawEntry | null {
+	const result: Record<string, unknown> = {};
+
+	if (typeof value.description === "string") {
+		result.description = value.description;
+	}
+
+	const env = asStringRecord(value.env);
+	if (env) {
+		result.env = env;
+	}
+
+	const headers = buildExternalHeaders(value);
+	if (headers) {
+		result.headers = headers;
+	}
+
+	const auth = asString(value.auth);
+	if (auth) {
+		result.auth = auth;
+	}
+
+	const tokenCacheDir = asString(
+		value.tokenCacheDir ?? value.token_cache_dir ?? value.token_cacheDir,
+	);
+	if (tokenCacheDir) {
+		result.tokenCacheDir = tokenCacheDir;
+	}
+
+	const clientName = asString(value.clientName ?? value.client_name);
+	if (clientName) {
+		result.clientName = clientName;
+	}
+
+	const url = asString(
+		value.baseUrl ??
+			value.base_url ??
+			value.url ??
+			value.serverUrl ??
+			value.server_url,
+	);
+	if (url) {
+		result.baseUrl = url;
+	}
+
+	const commandValue = value.command ?? value.executable;
+	if (
+		Array.isArray(commandValue) &&
+		commandValue.every((item) => typeof item === "string")
+	) {
+		result.command = commandValue;
+	} else if (typeof commandValue === "string") {
+		result.command = commandValue;
+	}
+
+	if (
+		Array.isArray(value.args) &&
+		value.args.every((item) => typeof item === "string")
+	) {
+		result.args = value.args;
+	}
+
+	const parsed = RawEntrySchema.safeParse(result);
+	return parsed.success ? parsed.data : null;
+}
+
+function buildExternalHeaders(
+	record: Record<string, unknown>,
+): Record<string, string> | undefined {
+	const headers: Record<string, string> = {};
+
+	const literalHeaders = asStringRecord(record.headers);
+	if (literalHeaders) {
+		Object.assign(headers, literalHeaders);
+	}
+
+	const bearerToken = asString(record.bearerToken ?? record.bearer_token);
+	if (bearerToken) {
+		headers.Authorization = `Bearer ${bearerToken}`;
+	}
+
+	const bearerTokenEnv = asString(
+		record.bearerTokenEnv ?? record.bearer_token_env,
+	);
+	if (bearerTokenEnv) {
+		headers.Authorization = `$env:${bearerTokenEnv}`;
+	}
+
+	return Object.keys(headers).length > 0 ? headers : undefined;
+}
+
+function pathsForImport(kind: ImportKind, rootDir: string): string[] {
+	switch (kind) {
+		case "cursor":
+			return [
+				path.resolve(rootDir, ".cursor", "mcp.json"),
+				defaultCursorUserConfigPath(),
+			];
+		case "claude-code":
+			return [
+				path.resolve(rootDir, ".claude", "mcp.json"),
+				path.join(os.homedir(), ".claude", "mcp.json"),
+				path.join(os.homedir(), ".claude.json"),
+			];
+		case "claude-desktop":
+			return [defaultClaudeDesktopConfigPath()];
+		case "codex":
+			return [path.join(os.homedir(), ".codex", "config.toml")];
+		default:
+			return [];
+	}
+}
+
+function defaultCursorUserConfigPath(): string {
+	if (process.platform === "darwin") {
+		return path.join(os.homedir(), ".cursor", "mcp.json");
+	}
+	if (process.platform === "win32") {
+		const appData =
+			process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming");
+		return path.join(appData, "Cursor", "mcp.json");
+	}
+	return path.join(os.homedir(), ".config", "Cursor", "mcp.json");
+}
+
+function defaultClaudeDesktopConfigPath(): string {
+	if (process.platform === "darwin") {
+		return path.join(
+			os.homedir(),
+			"Library",
+			"Application Support",
+			"Claude",
+			"claude_desktop_config.json",
+		);
+	}
+	if (process.platform === "win32") {
+		const appData =
+			process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming");
+		return path.join(appData, "Claude", "claude_desktop_config.json");
+	}
+	return path.join(
+		os.homedir(),
+		".config",
+		"Claude",
+		"claude_desktop_config.json",
+	);
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+	try {
+		await fs.access(filePath);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function asString(value: unknown): string | undefined {
+	return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function asStringRecord(input: unknown): Record<string, string> | undefined {
+	if (!input || typeof input !== "object") {
+		return undefined;
+	}
+	const record: Record<string, string> = {};
+	for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+		if (typeof value === "string") {
+			record[key] = value;
+		} else if (typeof value === "number" || typeof value === "boolean") {
+			record[key] = String(value);
+		}
+	}
+	return Object.keys(record).length > 0 ? record : undefined;
 }
 
 export function toFileUrl(filePath: string): URL {

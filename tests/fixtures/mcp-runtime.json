@@ -24,11 +24,11 @@
 			}
 		},
 		"next-devtools": {
-			"description": "Next.js dev server introspection for the Sweetistics web app (project metadata, logs, page insights).",
+			"description": "Next.js dev server introspection (project metadata, logs, page insights).",
 			"baseUrl": "http://localhost:3000/_next/mcp"
 		},
 		"playwright": {
-			"description": "Playwright MCP server for structured browser automation using Playwright's accessibility-driven tooling.",
+			"description": "Playwright MCP server for accessibility-driven automation.",
 			"command": "bash",
 			"args": [
 				"scripts/mcp_stdio_wrapper.sh",
@@ -40,13 +40,13 @@
 			]
 		},
 		"vercel": {
-			"description": "Vercel MCP (requires Vercel account OAuth).",
+			"description": "Vercel MCP (requires OAuth).",
 			"baseUrl": "https://mcp.vercel.com",
 			"auth": "oauth",
-			"tokenCacheDir": "~/.cache/sweetistics/mcp-tokens/vercel"
+			"tokenCacheDir": "~/.cache/mcp-runtime/vercel"
 		},
 		"firecrawl": {
-			"description": "Firecrawl hosted MCP for authenticated scraping and content extraction.",
+			"description": "Firecrawl hosted MCP for authenticated scraping and extraction.",
 			"baseUrl": "https://mcp.firecrawl.dev/v2/mcp",
 			"headers": {
 				"Authorization": "Bearer ${FIRECRAWL_API_KEY}"
@@ -70,8 +70,9 @@
 			}
 		},
 		"shadcn": {
-			"description": "shadcn/ui registry MCP for browsing and installing ReUI components.",
+			"description": "shadcn/ui registry MCP for browsing component recipes.",
 			"baseUrl": "https://www.shadcn.io/api/mcp"
 		}
-	}
+	},
+	"imports": []
 }

@@ -21,6 +21,7 @@ npm install mcp-runtime
 - Replace `pnpm mcp:list` with `npx mcp-runtime list`.
 - Replace `pnpm mcp:call <server>.<tool> key=value` with `npx mcp-runtime call <server>.<tool> key=value`.
 - Add `--config <path>` if your configuration is not under `./config/mcp-runtime.json`.
+- Optional: set `"imports"` inside `mcp-runtime.json` (for example `[]` to disable auto-imports or `["cursor", "codex"]` to customize the order).
 - Append `--tail-log` to stream the last 20 lines of any log file returned by the tool.
 
 ## 3. OAuth Tokens

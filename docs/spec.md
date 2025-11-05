@@ -45,6 +45,7 @@ summary: 'Plan for the mcp-runtime package replacing the Sweetistics pnpm MCP he
 
 ## Configuration
 - Single file `config/mcp-runtime.json` mirrors Cursor/Claude schema: `mcpServers` map with entries containing `baseUrl` or `command`+`args`, optional `headers`, `env`, `description`, `auth`, `tokenCacheDir`, and convenience `bearerToken`/`bearerTokenEnv` fields.
+- Optional `imports` array (defaulting to ['cursor', 'claude-code', 'claude-desktop', 'codex']) controls auto-merging of editor configs; entries earlier in the list win conflicts while local definitions can still override.
 - Provide `configPath` override for scripts/tests; keep inline overrides in examples for completeness but default to file-based configuration.
 - Add fixtures validating HTTP vs. stdio normalization and header/env behavior.
 
