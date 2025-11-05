@@ -102,7 +102,7 @@ Generate a single executable you can ship to agents or drop on a PATH:
 
 ```bash
 npx mcporter generate-cli \
-  --server '{"name":"context7","command":"https://mcp.context7.com/mcp"}' \
+  --command https://mcp.context7.com/mcp \
   --compile
 chmod +x context7
 ./context7 list-tools
