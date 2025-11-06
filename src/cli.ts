@@ -1,9 +1,9 @@
 #!/usr/bin/env node
+import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { ChildProcess } from 'node:child_process';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { CliArtifactMetadata, SerializedServerDefinition } from './cli-metadata.js';
 import { readCliMetadata } from './cli-metadata.js';
@@ -779,9 +779,7 @@ export async function handleCall(runtime: Awaited<ReturnType<typeof createRuntim
   } catch (error) {
     if (error instanceof Error && error.message === 'Timeout') {
       const timeoutDisplay = `${timeoutMs}ms`;
-      await runtime
-        .close(server)
-        .catch(() => {});
+      await runtime.close(server).catch(() => {});
       throw new Error(
         `Call to ${server}.${tool} timed out after ${timeoutDisplay}. Override MCPORTER_CALL_TIMEOUT or pass --timeout to adjust.`
       );
