@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ServerDefinition } from '../src/config.js';
+import { CliUsageError } from '../src/cli/errors.js';
 
 process.env.MCPORTER_DISABLE_AUTORUN = '1';
 const cliModulePromise = import('../src/cli.js');
@@ -76,6 +77,14 @@ describe('CLI call argument parsing', () => {
     expect(parsed.args).toEqual({ issueId: 'ISSUE-123', body: 'Hello', notify: false });
   });
 
+  it('parses positional function-call arguments when labels are omitted', async () => {
+    const { parseCallArguments } = await cliModulePromise;
+    const parsed = parseCallArguments(['context7.resolve-library-id("value", 2)']);
+    expect(parsed.server).toBe('context7');
+    expect(parsed.tool).toBe('resolve-library-id');
+    expect(parsed.positionalArgs).toEqual(['value', 2]);
+  });
+
   it('supports function-call syntax when the server is provided separately', async () => {
     const { parseCallArguments } = await cliModulePromise;
     const parsed = parseCallArguments(['--server', 'linear', 'create_comment(issueId: "123")']);
@@ -91,18 +100,16 @@ describe('CLI call argument parsing', () => {
     );
   });
 
-  it('requires named arguments in the call expression', async () => {
-    const { parseCallArguments } = await cliModulePromise;
-    expect(() => parseCallArguments(['linear.create_comment("oops")'])).toThrow(
-      'Function-call syntax requires named arguments (e.g. issueId: 123).'
-    );
-  });
-
   it('throws when trailing tokens lack key=value formatting', async () => {
     const { parseCallArguments } = await cliModulePromise;
     expect(() => parseCallArguments(['chrome-devtools', 'list_pages', 'oops'])).toThrow(
       "Argument 'oops' must be key=value or key:value format."
     );
+  });
+
+  it('surfaces a helpful error when function-call syntax cannot be parsed', async () => {
+    const { parseCallArguments } = await cliModulePromise;
+    expect(() => parseCallArguments(['linear.create_comment(oops)'])).toThrow(CliUsageError);
   });
 
   it('aborts long-running tools when the timeout elapses', async () => {
@@ -219,6 +226,37 @@ describe('CLI call argument parsing', () => {
     expect(errorSpy).not.toHaveBeenCalled();
 
     errorSpy.mockRestore();
+  });
+
+  it('maps positional function arguments using schema order', async () => {
+    const { handleCall } = await cliModulePromise;
+    const callTool = vi.fn().mockResolvedValue({ ok: true });
+    const listTools = vi.fn().mockResolvedValue([
+      {
+        name: 'resolve-library-id',
+        description: 'Lookup',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            libraryName: { type: 'string' },
+            region: { type: 'string' },
+          },
+          required: ['libraryName'],
+        },
+      },
+    ]);
+
+    const runtime = {
+      callTool,
+      listTools,
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Awaited<ReturnType<typeof import('../src/runtime.js')['createRuntime']>>;
+
+    await handleCall(runtime, ['context7.resolve-library-id("library", "us-east-1")']);
+
+    expect(callTool).toHaveBeenCalledWith('context7', 'resolve-library-id', {
+      args: { libraryName: 'library', region: 'us-east-1' },
+    });
   });
 
   it('registers an ad-hoc HTTP server when --http-url is provided', async () => {

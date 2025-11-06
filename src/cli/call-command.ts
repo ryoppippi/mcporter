@@ -1,6 +1,9 @@
+import type { ServerToolInfo } from '../runtime.js';
 import { createCallResult } from '../result-utils.js';
 import { type EphemeralServerSpec, persistEphemeralServer, resolveEphemeralServer } from './adhoc-server.js';
 import { parseCallExpressionFragment } from './call-expression-parser.js';
+import { CliUsageError } from './errors.js';
+import { extractOptions } from './generate/tools.js';
 import { chooseClosestIdentifier, normalizeIdentifier } from './identifier-helpers.js';
 import { extractEphemeralServerFlags } from './ephemeral-flags.js';
 import { type OutputFormat, printCallOutput, tailLogIfRequested } from './output-utils.js';
@@ -13,6 +16,7 @@ interface CallArgsParseResult {
   server?: string;
   tool?: string;
   args: Record<string, unknown>;
+  positionalArgs?: unknown[];
   tailLog: boolean;
   output: OutputFormat;
   timeoutMs?: number;
@@ -110,7 +114,12 @@ export function parseCallArguments(args: string[]): CallArgsParseResult {
   }
 
   if (positional.length > 0) {
-    const callExpression = parseCallExpressionFragment(positional[0] ?? '');
+    let callExpression: ReturnType<typeof parseCallExpressionFragment>;
+    try {
+      callExpression = parseCallExpressionFragment(positional[0] ?? '');
+    } catch (error) {
+      throw buildCallExpressionUsageError(error);
+    }
     if (callExpression) {
       positional.shift();
       if (callExpression.server) {
@@ -128,6 +137,9 @@ export function parseCallArguments(args: string[]): CallArgsParseResult {
       }
       result.tool = callExpression.tool;
       Object.assign(result.args, callExpression.args);
+      if (callExpression.positionalArgs && callExpression.positionalArgs.length > 0) {
+        result.positionalArgs = [...(result.positionalArgs ?? []), ...callExpression.positionalArgs];
+      }
     }
   }
 
@@ -246,7 +258,8 @@ export async function handleCall(
   const { server, tool } = resolveCallTarget(parsed);
 
   const timeoutMs = resolveCallTimeout(parsed.timeoutMs);
-  const { result } = await invokeWithAutoCorrection(runtime, server, tool, parsed.args, timeoutMs);
+  const hydratedArgs = await hydratePositionalArguments(runtime, server, tool, parsed.args, parsed.positionalArgs);
+  const { result } = await invokeWithAutoCorrection(runtime, server, tool, hydratedArgs, timeoutMs);
 
   const wrapped = createCallResult(result);
   printCallOutput(wrapped, result, parsed.output);
@@ -305,6 +318,52 @@ function coerceValue(value: string): unknown {
     }
   }
   return trimmed;
+}
+
+async function hydratePositionalArguments(
+  runtime: Awaited<ReturnType<typeof import('../runtime.js')['createRuntime']>>,
+  server: string,
+  tool: string,
+  namedArgs: Record<string, unknown>,
+  positionalArgs: unknown[] | undefined
+): Promise<Record<string, unknown>> {
+  if (!positionalArgs || positionalArgs.length === 0) {
+    return namedArgs;
+  }
+  // We need the schema order to know which field each positional argument maps to; pull the
+  // tool list with schemas instead of guessing locally so optional/required order stays correct.
+  const tools = await runtime.listTools(server, { includeSchema: true }).catch(() => undefined);
+  if (!tools) {
+    throw new Error('Unable to load tool metadata; name positional arguments explicitly.');
+  }
+  const toolInfo = tools.find((entry) => entry.name === tool);
+  if (!toolInfo) {
+    throw new Error(`Unknown tool '${tool}' on server '${server}'. Double-check the name or run mcporter list ${server}.`);
+  }
+  if (!toolInfo.inputSchema) {
+    throw new Error(`Tool '${tool}' does not expose an input schema; name positional arguments explicitly.`);
+  }
+  const options = extractOptions(toolInfo as ServerToolInfo);
+  if (options.length === 0) {
+    throw new Error(`Tool '${tool}' has no declared parameters; remove positional arguments.`);
+  }
+  // Respect whichever parameters the user already supplied by name so positional values only
+  // populate the fields that are still unset.
+  const remaining = options.filter((option) => !(option.property in namedArgs));
+  if (positionalArgs.length > remaining.length) {
+    throw new Error(
+      `Too many positional arguments (${positionalArgs.length}) supplied; only ${remaining.length} parameter${remaining.length === 1 ? '' : 's'} remain on ${tool}.`
+    );
+  }
+  const hydrated: Record<string, unknown> = { ...namedArgs };
+  positionalArgs.forEach((value, index) => {
+    const target = remaining[index];
+    if (!target) {
+      return;
+    }
+    hydrated[target.property] = value;
+  });
+  return hydrated;
 }
 
 type ToolResolution = { kind: 'auto-correct'; tool: string } | { kind: 'suggest'; tool: string };
@@ -402,4 +461,20 @@ function extractMissingToolFromError(error: unknown): string | undefined {
   }
   const match = message.match(/Tool\s+([A-Za-z0-9._-]+)\s+not found/i);
   return match?.[1];
+}
+
+function buildCallExpressionUsageError(error: unknown): CliUsageError {
+  const reason = error instanceof Error ? error.message : String(error ?? 'Unknown error');
+  const lines = [
+    'Unable to parse function-style call.',
+    `Reason: ${reason}`,
+    '',
+    'Examples:',
+    "  mcporter 'context7.resolve-library-id(libraryName: \"react\")'",
+    "  mcporter 'context7.resolve-library-id(\"react\")'",
+    '  mcporter context7.resolve-library-id libraryName=react',
+    '',
+    'Tip: wrap the entire expression in single quotes so the shell preserves parentheses and commas.',
+  ];
+  return new CliUsageError(lines.join('\n'));
 }

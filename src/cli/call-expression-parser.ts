@@ -13,6 +13,7 @@ interface ParsedCallExpression {
   server?: string;
   tool: string;
   args: Record<string, unknown>;
+  positionalArgs?: unknown[];
 }
 
 const ACORN_OPTIONS = {
@@ -62,19 +63,32 @@ export function parseCallExpressionFragment(raw: string): ParsedCallExpression |
     };
   }
 
-  if (callExpression.arguments.length > 1) {
-    throw new Error(
-      'Function-call syntax only supports named arguments. Separate values with commas inside an object.'
-    );
+  if (callExpression.arguments.length === 1 && callExpression.arguments[0]?.type === 'ObjectExpression') {
+    const argument = callExpression.arguments[0];
+    if (!argument || argument.type !== 'ObjectExpression') {
+      throw new Error('Function-call syntax requires named arguments (e.g. issueId: 123).');
+    }
+    const args = extractObject(argument);
+    return { ...splitPrefix(prefix), args };
   }
 
-  const argument = callExpression.arguments[0];
-  if (!argument || argument.type !== 'ObjectExpression') {
-    throw new Error('Function-call syntax requires named arguments (e.g. issueId: 123).');
-  }
+  // At this point we know the call expression isn't a plain object literal, so we interpret
+  // whatever arguments remain positionally. We still reuse the literal extractor so nested
+  // arrays/objects stay supported.
+  const positionalArgs = callExpression.arguments.map((argument) => {
+    if (!argument) {
+      throw new Error('Unsupported empty argument in call expression.');
+    }
+    if (argument.type === 'SpreadElement') {
+      throw new Error('Spread elements are not supported in call expressions.');
+    }
+    if (!isSupportedValue(argument as Expression)) {
+      throw new Error(`Unsupported argument expression: ${argument.type}.`);
+    }
+    return extractValue(argument as Expression);
+  });
 
-  const args = extractObject(argument);
-  return { ...splitPrefix(prefix), args };
+  return { ...splitPrefix(prefix), args: {}, positionalArgs };
 }
 
 function splitPrefix(prefix: string): { server?: string; tool: string } {

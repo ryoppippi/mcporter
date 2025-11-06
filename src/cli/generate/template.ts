@@ -238,6 +238,7 @@ export function renderToolCommand(
     : '';
   const { hiddenOptions } = selectDisplayOptions(tool.options, true);
   const optionalSummary = hiddenOptions.length > 0 ? formatOptionalSummary(hiddenOptions, { colorize: false }) : '';
+  // Matching `mcporter list`, add a compact optional-parameter hint so generated CLIs stay familiar.
   const optionalSnippet = optionalSummary
     ? `\n\t.addHelpText('afterAll', () => '\n${optionalSummary}\n')`
     : '';

@@ -2,6 +2,7 @@
 import fsPromises from 'node:fs/promises';
 import { handleCall as runHandleCall } from './cli/call-command.js';
 import { type EphemeralServerSpec, persistEphemeralServer, resolveEphemeralServer } from './cli/adhoc-server.js';
+import { CliUsageError } from './cli/errors.js';
 import { inferCommandRouting } from './cli/command-inference.js';
 import { extractEphemeralServerFlags } from './cli/ephemeral-flags.js';
 import { handleList } from './cli/list-command.js';
@@ -724,6 +725,11 @@ Global flags:
 
 if (process.env.MCPORTER_DISABLE_AUTORUN !== '1') {
   main().catch((error) => {
+    if (error instanceof CliUsageError) {
+      logError(error.message);
+      process.exit(1);
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
     logError(message, error instanceof Error ? error : undefined);
     process.exit(1);

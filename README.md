@@ -14,6 +14,16 @@ mcporter helps you lean into the "code execution" workflows highlighted in Anthr
 ## Quick Start
 
 mcporter auto-discovers the MCP servers you already configured in Cursor, Claude Code/Desktop, Codex, or local overrides. You can try it immediately with `npx`--no installation required.
+### Call syntax options
+
+```bash
+# Colon-delimited flags (shell-friendly)
+npx mcporter call linear.create_comment issueId:ENG-123 body:'Looks good!'
+
+# Function-call style (matches signatures from `mcporter list`)
+npx mcporter call 'linear.create_comment(issueId: "ENG-123", body: "Looks good!")'
+```
+
 
 ### List your MCP servers
 
@@ -92,9 +102,24 @@ Helpful flags:
 
 Timeouts default to 30 s; override with `MCPORTER_LIST_TIMEOUT` or `MCPORTER_CALL_TIMEOUT` when you expect slow startups.
 
+### Try an MCP without editing config
+
+```bash
+# Point at an HTTPS MCP server directly
+npx mcporter list --http-url https://mcp.linear.app/mcp --name linear
+
+# Run a local stdio MCP server via Bun
+npx mcporter call --stdio "bun run ./local-server.ts" --name local-tools
+```
+
+- Add `--persist config/mcporter.local.json` to save the inferred definition for future runs.
+- Use `--allow-http` if you truly need to hit a cleartext endpoint.
+- See [docs/adhoc.md](docs/adhoc.md) for a deep dive (env overrides, cwd, OAuth).
+
+
 ## Friendlier Tool Calls
 
-- **Function-call syntax.** Instead of juggling `--flag value`, you can call tools as `mcporter call 'linear.create_issue(title: "Bug", team: "ENG")'`. The parser supports nested objects/arrays and surfaces schema validation errors clearly. Deep dive in [docs/call-syntax.md](docs/call-syntax.md).
+- **Function-call syntax.** Instead of juggling `--flag value`, you can call tools as `mcporter call 'linear.create_issue(title: "Bug", team: "ENG")'`. The parser supports nested objects/arrays, lets you omit labels when you want to rely on schema order (e.g. `mcporter 'context7.resolve-library-id("react")'`), and surfaces schema validation errors clearly. Deep dive in [docs/call-syntax.md](docs/call-syntax.md).
 - **Flag shorthand still works.** Prefer CLI-style arguments? Stick with `mcporter linear.create_issue title=value team=value`, `title=value`, `title:value`, or even `title: value`—the CLI now normalizes all three forms.
 - **Cheatsheet.** See [docs/tool-calling.md](docs/tool-calling.md) for a quick comparison of every supported call style (auto-inferred verbs, flags, function-calls, and ad-hoc URLs).
 - **Auto-correct.** If you typo a tool name, mcporter inspects the server’s tool catalog, retries when the edit distance is tiny, and otherwise prints a `Did you mean …?` hint. The heuristic (and how to tune it) is captured in [docs/call-heuristic.md](docs/call-heuristic.md).
@@ -187,6 +212,9 @@ Friendly ergonomics baked into the proxy and result helpers:
 
 Drop down to `runtime.callTool()` whenever you need explicit control over arguments, metadata, or streaming options.
 
+
+Call `mcporter list <server>` any time you need the TypeScript-style signature, optional parameter hints, and sample invocations that match the CLI's function-call syntax.
+
 ## Generate a Standalone CLI
 
 Turn any server definition into a shareable CLI artifact:
@@ -261,3 +289,5 @@ CI runs the same trio via GitHub Actions.
 ## License
 
 MIT -- see [LICENSE](LICENSE).
+
+Further reading: [docs/tool-calling.md](docs/tool-calling.md), [docs/call-syntax.md](docs/call-syntax.md), [docs/adhoc.md](docs/adhoc.md).

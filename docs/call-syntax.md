@@ -5,7 +5,7 @@
 | Style | Example | Notes |
 |-------|---------|-------|
 | Flag-based (compatible) | `mcporter call linear.create_comment --issue-id LNR-123 --body "Hi"` | Use `key=value`, `key:value`, or `key: value` pairs—ideal for shell scripts. |
-| Function-call (expressive) | `mcporter call 'linear.create_comment(issueId: "LNR-123", body: "Hi")'` | Mirrors the pseudo-TypeScript signature shown by `mcporter list`. |
+| Function-call (expressive) | `mcporter call 'linear.create_comment(issueId: "LNR-123", body: "Hi")'` | Mirrors the pseudo-TypeScript signature shown by `mcporter list`; unlabeled values map to schema order. |
 
 Both forms share the same validation pipeline, so required parameters, enums, and formats behave identically.
 
@@ -36,7 +36,8 @@ Key details:
 
 ## Function-Call Syntax Details
 
-- **Named arguments only**: `issueId: "123"` is required; positional arguments are rejected so we can reliably map schema names.
+- **Named arguments preferred**: `issueId: "123"` keeps calls self-documenting. When labels are omitted, mcporter falls back to positional order defined by the tool schema.
+- **Optional positional fallback**: omit labels when calling `mcporter 'context7.resolve-library-id("react")'`—arguments map to the schema order after any explicitly named parameters.
 - **Literals supported**: strings, numbers, booleans, `null`, arrays, and nested objects. For strings containing spaces or commas, wrap the entire call in single quotes to keep the shell happy.
 - **Error feedback**: invalid keys, unsupported expressions, or parser failures bubble up with actionable messages (`Unsupported argument expression: Identifier`, `Unable to parse call expression: …`).
 - **Server selection**: You can embed the server in the expression (`linear.create_comment(...)`) or pass it separately (`--server linear create_comment(...)`).

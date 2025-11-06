@@ -164,6 +164,8 @@ export function formatExampleBlock(
   examples: string[],
   options?: { maxExamples?: number; maxLength?: number }
 ): string[] {
+  // Keep examples deterministic: dedupe, cap the total, then apply the same ellipsis logic
+  // used by the list command so generators/CLIs display identical call hints.
   const maxExamples = options?.maxExamples ?? 1;
   const maxLength = options?.maxLength ?? 80;
   return Array.from(new Set(examples))
