@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { GeneratedOption } from '../src/cli/generate/tools.js';
 import {
   buildDocComment,
+  formatCallExpressionExample,
+  formatFunctionSignature,
   formatOptionalSummary,
   selectDisplayOptions,
   wrapCommentText,
@@ -64,6 +66,37 @@ describe('formatOptionalSummary', () => {
     expect(summary).toContain('optional (7)');
     expect(summary).toContain('param0');
     expect(summary.trim().endsWith('...')).toBe(true);
+  });
+});
+
+describe('formatFunctionSignature', () => {
+  it('renders uncolored TypeScript-style signatures when colorize is false', () => {
+    const signature = formatFunctionSignature(
+      'create_comment',
+      [
+        baseOption({ property: 'issueId', description: 'Issue identifier', required: true }),
+        baseOption({ property: 'parentId', required: false, description: 'Optional parent' }),
+      ],
+      { title: 'Comment' },
+      { colorize: false }
+    );
+    expect(signature).toBe('function create_comment(issueId: string, parentId?: string): Comment;');
+  });
+
+  it('falls back to unknown return types when schema is empty', () => {
+    const signature = stripAnsi(formatFunctionSignature('list_docs', [], undefined));
+    expect(signature).toBe('function list_docs();');
+  });
+});
+
+describe('formatCallExpressionExample', () => {
+  it('uses example literals when provided and falls back for ids', () => {
+    const example = formatCallExpressionExample('linear', 'create_issue', [
+      baseOption({ property: 'title', required: true, exampleValue: 'Bug' }),
+      baseOption({ property: 'teamId', required: true }),
+      baseOption({ property: 'parentId', required: false }),
+    ]);
+    expect(example).toBe('mcporter call linear.create_issue(title: "Bug", teamId: "example-id")');
   });
 });
 
