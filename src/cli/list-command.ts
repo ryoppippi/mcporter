@@ -56,16 +56,19 @@ export async function handleList(
     console.log(`Listing ${servers.length} server(s) (per-server timeout: ${perServerTimeoutSeconds}s)`);
     const spinner = supportsSpinner ? ora(`Discovering ${servers.length} server(s)…`).start() : undefined;
     const spinnerActive = Boolean(spinner);
+    // Track rendered rows separately so we can show live progress yet still build an ordered footer summary afterward.
     const renderedResults: Array<ReturnType<typeof renderServerListRow> | undefined> = Array.from(
       { length: servers.length },
       () => undefined
     );
     let completedCount = 0;
 
+    // Kick off every list request up-front so slow servers don't block faster ones.
     const tasks = servers.map((server, index) =>
       (async (): Promise<ListSummaryResult> => {
         const startedAt = Date.now();
         try {
+          // autoAuthorize=false keeps the list command purely observational—no auth prompts mid-run.
           const tools = await withTimeout(runtime.listTools(server.name, { autoAuthorize: false }), perServerTimeoutMs);
           return {
             server,
@@ -83,6 +86,7 @@ export async function handleList(
         }
       })().then((result) => {
         const rendered = renderServerListRow(result, perServerTimeoutMs);
+        // Persist results in the original index so the final summary prints in config order, even though tasks resolve out of order.
         renderedResults[index] = rendered;
         completedCount += 1;
 
@@ -115,6 +119,7 @@ export async function handleList(
       if (!entry) {
         return;
       }
+      // Default anything unexpected to the error bucket so the footer still surfaces that something went wrong.
       const category = (entry as { category?: StatusCategory }).category ?? 'error';
       errorCounts[category] = (errorCounts[category] ?? 0) + 1;
     });
