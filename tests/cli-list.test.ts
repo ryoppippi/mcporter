@@ -9,7 +9,7 @@ describe('CLI list timeout handling', () => {
     const { extractListFlags } = await cliModulePromise;
     const args = ['--timeout', '7500', '--schema', 'server'];
     const flags = extractListFlags(args);
-    expect(flags).toEqual({ schema: true, timeoutMs: 7500, requiredOnly: false });
+    expect(flags).toEqual({ schema: true, timeoutMs: 7500, requiredOnly: true });
     expect(args).toEqual(['server']);
   });
 
@@ -18,6 +18,14 @@ describe('CLI list timeout handling', () => {
     const args = ['--required-only', '--schema', 'server'];
     const flags = extractListFlags(args);
     expect(flags).toEqual({ schema: true, timeoutMs: undefined, requiredOnly: true });
+    expect(args).toEqual(['server']);
+  });
+
+  it('parses --include-optional flag and removes it from args', async () => {
+    const { extractListFlags } = await cliModulePromise;
+    const args = ['--include-optional', 'server'];
+    const flags = extractListFlags(args);
+    expect(flags).toEqual({ schema: false, timeoutMs: undefined, requiredOnly: false });
     expect(args).toEqual(['server']);
   });
 
@@ -177,19 +185,18 @@ describe('CLI list classification', () => {
   );
   expect(lines.some((line) => line.includes('// Add two numbers'))).toBe(true);
   expect(lines.some((line) => line.includes('add({'))).toBe(true);
-  expect(lines.some((line) => line.includes('a: number') && line.includes('First operand'))).toBe(true);
-  expect(
-    lines.some((line) => line.includes('format?: "json" | "markdown"') && line.includes('Output serialization format'))
-  ).toBe(true);
-  expect(lines.some((line) => line.includes('dueBefore?: string') && line.includes('ISO 8601'))).toBe(true);
+    expect(lines.some((line) => line.includes('a: number') && line.includes('First operand'))).toBe(true);
+    expect(lines.some((line) => line.includes('format?:'))).toBe(false);
+    expect(lines.some((line) => line.includes('dueBefore?:'))).toBe(false);
+    expect(lines.some((line) => line.includes('// optional: format, dueBefore'))).toBe(true);
   expect(lines.some((line) => line.includes('Examples:'))).toBe(true);
-  expect(lines.some((line) => line.includes('mcporter call calculator.add('))).toBe(true);
+    expect(lines.some((line) => line.includes('mcporter call calculator.add(a: 1)'))).toBe(true);
   expect(listToolsSpy).toHaveBeenCalledWith('calculator', { includeSchema: true });
 
   logSpy.mockRestore();
   });
 
-  it('omits optional parameters when --required-only is set', async () => {
+  it('includes optional parameters when --include-optional is set', async () => {
     const { handleList } = await cliModulePromise;
     const listToolsSpy = vi.fn((_name: string, options?: { includeSchema?: boolean }) =>
       Promise.resolve([
@@ -221,17 +228,19 @@ describe('CLI list classification', () => {
 
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await handleList(runtime, ['--required-only', 'calculator']);
+    await handleList(runtime, ['--include-optional', 'calculator']);
 
     const stripAnsi = (value: string) => value.replace(/\x1B\[[0-9;]*m/g, '');
     const lines = logSpy.mock.calls.map((call) => stripAnsi(call.join(' ')));
 
     expect(lines.some((line) => line.includes('add({'))).toBe(true);
     expect(lines.some((line) => line.includes('a: number') && line.includes('First operand'))).toBe(true);
-    expect(lines.some((line) => line.includes('format?:'))).toBe(false);
-    expect(lines.some((line) => line.includes('dueBefore?:'))).toBe(false);
-    expect(lines.some((line) => line.includes('// optional: format, dueBefore'))).toBe(true);
-    expect(lines.some((line) => line.includes('mcporter call calculator.add(a: 1)'))).toBe(true);
+    expect(
+      lines.some((line) => line.includes('format?: "json" | "markdown"') && line.includes('Output serialization format'))
+    ).toBe(true);
+    expect(lines.some((line) => line.includes('dueBefore?: string') && line.includes('ISO 8601'))).toBe(true);
+    expect(lines.some((line) => line.includes('// optional:'))).toBe(false);
+    expect(lines.some((line) => line.includes('mcporter call calculator.add(a: 1, format: "json")'))).toBe(true);
     expect(listToolsSpy).toHaveBeenCalledWith('calculator', { includeSchema: true });
 
     logSpy.mockRestore();

@@ -10,7 +10,7 @@ import { LIST_TIMEOUT_MS, withTimeout } from './timeouts.js';
 export function extractListFlags(args: string[]): { schema: boolean; timeoutMs?: number; requiredOnly: boolean } {
   let schema = false;
   let timeoutMs: number | undefined;
-  let requiredOnly = false;
+  let requiredOnly = true;
   let index = 0;
   while (index < args.length) {
     const token = args[index];
@@ -21,6 +21,11 @@ export function extractListFlags(args: string[]): { schema: boolean; timeoutMs?:
     }
     if (token === '--required-only') {
       requiredOnly = true;
+      args.splice(index, 1);
+      continue;
+    }
+    if (token === '--include-optional' || token === '--all-parameters') {
+      requiredOnly = false;
       args.splice(index, 1);
       continue;
     }
