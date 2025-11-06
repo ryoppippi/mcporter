@@ -162,4 +162,49 @@ describe('CLI call argument parsing', () => {
 
     errorSpy.mockRestore();
   });
+
+  it('falls back to the original error when tool listings fail', async () => {
+    const { handleCall } = await cliModulePromise;
+    const callError = new Error('MCP error -32602: Tool listIssues not found');
+    const callTool = vi.fn().mockRejectedValue(callError);
+    const listTools = vi.fn().mockRejectedValue(new Error('auth required'));
+    const runtime = {
+      callTool,
+      listTools,
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Awaited<ReturnType<typeof import('../src/runtime.js')['createRuntime']>>;
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(handleCall(runtime, ['linear.listIssues'])).rejects.toThrow(callError.message);
+
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(listTools).toHaveBeenCalledWith('linear');
+
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('does not suggest alternatives for non tool-not-found errors', async () => {
+    const { handleCall } = await cliModulePromise;
+    const failure = new Error('MCP error -32000: Connection closed');
+    const callTool = vi.fn().mockRejectedValue(failure);
+    const listTools = vi.fn();
+    const runtime = {
+      callTool,
+      listTools,
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Awaited<ReturnType<typeof import('../src/runtime.js')['createRuntime']>>;
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(handleCall(runtime, ['linear.listIssues'])).rejects.toThrow(failure.message);
+
+    expect(listTools).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
 });
