@@ -627,7 +627,8 @@ function printHelp(message?: string): void {
   console.error(`Usage: mcporter <command> [options]
 
 Commands:
-  list [name] [--schema]             List configured MCP servers (and tools for a server)
+  list [name] [--schema] [--json]    List configured MCP servers (and tools for a server)
+    --json                          Emit machine-readable JSON instead of text output
   call [selector] [flags]            Call a tool (selector like server.tool)
     --tail-log                       Tail log output when the tool returns a log file path
     --output <format>                Output format: auto|text|markdown|json|raw (default auto)

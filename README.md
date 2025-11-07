@@ -36,6 +36,8 @@ npx mcporter list shadcn.io/api/mcp.getComponents           # URL + tool suffix 
 npx mcporter list --stdio "bun run ./local-server.ts" --env TOKEN=xyz
 ```
 
+- Add `--json` to emit a machine-readable summary with per-server statuses (auth/offline/http/error counts) and, for single-server runs, the full tool schema payload.
+
 You can now point `mcporter list` at ad-hoc servers: provide a URL directly or use the new `--http-url/--stdio` flags (plus `--env`, `--cwd`, `--name`, or `--persist`) to describe any MCP endpoint. Follow up with `mcporter auth https://…` (or the same flag set) to finish OAuth without editing config. Full details live in [docs/adhoc.md](docs/adhoc.md).
 
 Single-server listings now read like a TypeScript header file so you can copy/paste the signature straight into `mcporter call`:
@@ -130,6 +132,8 @@ Helpful flags:
 - `--log-level <debug|info|warn|error>` -- adjust verbosity (respects `MCPORTER_LOG_LEVEL`).
 - `--tail-log` -- stream the last 20 lines of any log files referenced by the tool response.
 - `--output <format>` or `--raw` -- control formatted output (defaults to pretty-printed auto detection).
+- `--json` (on `mcporter list`) -- emit JSON summaries/counts instead of text. Multi-server runs report per-server statuses, counts, and connection issues; single-server runs include the full tool metadata.
+- `--output json/raw` (on `mcporter call`) -- when a connection fails, MCPorter prints the usual colorized hint and also emits a structured `{ server, tool, issue }` envelope so scripts can handle auth/offline/http errors programmatically.
 - `--all-parameters` -- show every schema field when listing a server (default output shows at least five parameters plus a summary of the rest).
 - `--http-url <https://…>` / `--stdio "command …"` -- describe an ad-hoc MCP server inline (pair with `--env KEY=value`, `--cwd`, `--name`, and `--persist <config.json>` as needed). These flags now work with `mcporter auth` too, so `mcporter auth https://mcp.example.com/mcp` just works.
 - For OAuth-protected servers such as `vercel`, run `npx mcporter auth vercel` once to complete login.
