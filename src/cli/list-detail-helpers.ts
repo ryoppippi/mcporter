@@ -33,6 +33,13 @@ export interface ToolDocModel {
   examples: string[];
   displayOptions: GeneratedOption[];
   hiddenOptions: GeneratedOption[];
+  optionDocs: ToolOptionDoc[];
+}
+
+export interface ToolOptionDoc {
+  option: GeneratedOption;
+  flagLabel: string;
+  description: string;
 }
 
 const DEFAULT_MIN_VISIBLE_PARAMS = 5;
@@ -294,6 +301,7 @@ export function buildToolDoc(input: ToolDocInput): ToolDocModel {
   const tsSignature = formatFunctionSignature(toolName, displayOptions, outputSchema, { colorize: false });
   const flagUsage = formatFlagUsage(displayOptions, flagExtras, { colorize });
   const optionalSummary = hiddenOptions.length > 0 ? formatOptionalSummary(hiddenOptions, { colorize }) : undefined;
+  const optionDocs = options.map((option) => buildOptionDoc(option, { colorize }));
   const callExample = formatCallExpressionExample(
     serverName,
     toolName,
@@ -311,6 +319,7 @@ export function buildToolDoc(input: ToolDocInput): ToolDocModel {
     examples,
     displayOptions,
     hiddenOptions,
+    optionDocs,
   };
 }
 
@@ -321,7 +330,7 @@ export function formatFlagUsage(
 ): string {
   const colorize = opts?.colorize !== false;
   const entries: Array<{ text: string; required: boolean }> = options.map((option) => ({
-    text: `--${option.cliName} ${option.placeholder}`.trim(),
+    text: formatFlagLabel(option),
     required: option.required,
   }));
   if (extras) {
@@ -342,6 +351,10 @@ export function formatFlagUsage(
   }
   const rendered = parts.join(' ');
   return colorize ? extraDimText(rendered) : rendered;
+}
+
+export function formatFlagLabel(option: GeneratedOption): string {
+  return `--${option.cliName} ${option.placeholder}`.trim();
 }
 
 function formatInlineParameter(option: GeneratedOption, colorize: boolean): string {
@@ -418,4 +431,45 @@ function formatTypeAnnotation(option: GeneratedOption, colorize: boolean): strin
     return `${base} ${tint(`/* ${option.formatHint} */`)}`;
   }
   return base;
+}
+
+function buildOptionDoc(option: GeneratedOption, opts?: { colorize?: boolean }): ToolOptionDoc {
+  return {
+    option,
+    flagLabel: formatFlagLabel(option),
+    description: formatOptionDescription(option, opts),
+  };
+}
+
+function formatOptionDescription(option: GeneratedOption, opts?: { colorize?: boolean }): string {
+  const colorize = opts?.colorize ?? false;
+  const tint = colorize ? extraDimText : (value: string): string => value;
+  let description = option.description ? option.description : `Set ${option.property}.`;
+  const detailParts: string[] = [];
+  if (option.enumValues && option.enumValues.length > 0) {
+    detailParts.push(`choices: ${option.enumValues.join(', ')}`);
+  }
+  if (option.defaultValue !== undefined) {
+    detailParts.push(`default: ${formatHelpValue(option.defaultValue)}`);
+  }
+  if (option.exampleValue) {
+    detailParts.push(`example: ${option.exampleValue}`);
+  }
+  if (detailParts.length > 0) {
+    description += ` (${detailParts.join('; ')})`;
+  }
+  return tint(description);
+}
+
+function formatHelpValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry)).join(', ');
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (value && typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+  return String(value);
 }

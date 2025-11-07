@@ -38,13 +38,14 @@ The goals below align `mcporter list`, the TypeScript CLI generator, and any fut
   3. Added helper unit tests covering mixed required/optional flags and extra entries (e.g., `--raw <json>`).
 - **Next**: Expose the shared usage string in `mcporter list` once we add a `--flags` view.
 
-## 5. ToolDocModel Abstraction
+## 5. ToolDocModel Abstraction *(Completed)*
 
-- **Problem**: Each surface assembles doc comments, signatures, optional summaries, and examples separately.
-- **Plan**:
-  1. Introduce `buildToolDoc(tool: ServerToolInfo, opts)` returning `{ docLines, signature, optionalSummary, examples[] }`.
-  2. `handleList()` and `renderToolCommand()` will render from this struct instead of recomputing each piece.
-  3. Unit-test the builder directly to avoid fixture duplication in CLI/generator tests.
+- **Problem**: The runtime CLI and generator still built flag labels + option descriptions separately, so changes to detail formatting required touching multiple files.
+- **What we did**:
+  1. Expanded `ToolDocModel` with `optionDocs` + `formatFlagLabel()`, so each tool’s flag label/description is computed once inside `buildToolDoc`.
+  2. Updated `renderToolCommand()` to consume `doc.optionDocs` instead of reassembling strings, leaving only the parser wiring as generator-specific.
+  3. Added assertions in `tests/list-detail-helpers.test.ts` for the new metadata, keeping the abstraction covered.
+- **Next**: With the model centralised, future surfaces (e.g., `--emit-ts`) can render signatures/examples/options straight from `buildToolDoc`.
 
 ## 6. Future TS/DTS Export Mode
 

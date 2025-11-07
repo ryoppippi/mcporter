@@ -152,6 +152,12 @@ describe('buildToolDoc', () => {
     expect(stripAnsi(doc.flagUsage)).toBe('--issue-id <issue-id> --body <body> [--parent-id <parent-id>]');
     expect(doc.optionalSummary).toBeUndefined();
     expect(doc.examples[0]).toContain('mcporter call linear.create_comment');
+    expect(doc.optionDocs.map((entry) => entry.flagLabel)).toEqual([
+      '--issue-id <issue-id>',
+      '--body <body>',
+      '--parent-id <parent-id>',
+    ]);
+    expect(doc.optionDocs[0]?.description).toContain('Issue identifier');
     expect(doc.hiddenOptions).toHaveLength(0);
   });
 });

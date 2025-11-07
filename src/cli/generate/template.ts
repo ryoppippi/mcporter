@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { ServerDefinition } from '../../config.js';
 import type { GeneratedOption, ToolMetadata } from './tools.js';
 import { buildEmbeddedSchemaMap } from './tools.js';
-import { buildToolDoc } from '../list-detail-helpers.js';
+import { buildToolDoc, type ToolOptionDoc } from '../list-detail-helpers.js';
 
 export interface TemplateInput {
   outputPath?: string;
@@ -209,7 +209,6 @@ export function renderToolCommand(
 ): { block: string; commandName: string; signature: string; tsSignature: string } {
   const commandName = tool.tool.name.replace(/[^a-zA-Z0-9-]/g, '-');
   const description = tool.tool.description ?? `Invoke the ${tool.tool.name} tool.`;
-  const optionLines = tool.options.map((option) => renderOption(option)).join('\n');
   const buildArgs = tool.options
     .map((option) => {
       const source = `cmdOpts.${option.property}`;
@@ -227,6 +226,7 @@ export function renderToolCommand(
     flagExtras: [{ text: '--raw <json>' }],
   });
   const flagUsage = doc.flagUsage;
+  const optionLines = doc.optionDocs.map((entry) => renderOption(entry)).join('\n');
   const summary = flagUsage ? `${commandName} ${flagUsage}` : commandName;
   const signature = summary;
   const usageSnippet = flagUsage ? `.usage(${JSON.stringify(flagUsage)})\n` : '';
@@ -267,40 +267,12 @@ ${optionLines ? `\n${optionLines}` : ''}
   return { block, commandName, signature, tsSignature };
 }
 
-function renderOption(option: GeneratedOption): string {
-  const flag = `--${option.cliName} ${option.placeholder}`;
-  let description = option.description ? option.description : `Set ${option.property}.`;
-  const detailParts: string[] = [];
-  if (option.enumValues && option.enumValues.length > 0) {
-    detailParts.push(`choices: ${option.enumValues.join(', ')}`);
-  }
-  if (option.defaultValue !== undefined) {
-    detailParts.push(`default: ${formatHelpValue(option.defaultValue)}`);
-  }
-  if (option.exampleValue) {
-    detailParts.push(`example: ${option.exampleValue}`);
-  }
-  if (detailParts.length > 0) {
-    description += ` (${detailParts.join('; ')})`;
-  }
-  const parser = optionParser(option);
-  const base = option.required
-    ? `.requiredOption(${JSON.stringify(flag)}, ${JSON.stringify(description)}${parser ? `, ${parser}` : ''})`
-    : `.option(${JSON.stringify(flag)}, ${JSON.stringify(description)}${parser ? `, ${parser}` : ''})`;
-  return `	${base}`;
-}
-
-function formatHelpValue(value: unknown): string {
-  if (Array.isArray(value)) {
-    return value.map((entry) => String(entry)).join(', ');
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (value && typeof value === 'object') {
-    return JSON.stringify(value);
-  }
-  return String(value);
+function renderOption(optionDoc: ToolOptionDoc): string {
+  const parser = optionParser(optionDoc.option);
+  const method = optionDoc.option.required ? '.requiredOption' : '.option';
+  return `\t${method}(${JSON.stringify(optionDoc.flagLabel)}, ${JSON.stringify(optionDoc.description)}${
+    parser ? `, ${parser}` : ''
+  })`;
 }
 
 function optionParser(option: GeneratedOption): string | undefined {
