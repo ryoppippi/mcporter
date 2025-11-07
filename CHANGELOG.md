@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [0.3.3] - 2025-11-07
+
 ### Code generation
 - When a server definition omits `description`, `mcporter generate-cli` now asks the MCP server for its own `instructions`/`serverInfo.title` during tool discovery and embeds that value, so generated CLIs introduce themselves with the real server description instead of the generic “Standalone CLI…” fallback.
 - Embedded tool listings inside generated CLIs now show each command’s flag signature (no `usage:` prefix) separated by blank lines, and per-command `--help` output inherits the same colorized usage/option styling as the main `mcporter` binary for readability on rich TTYs.
