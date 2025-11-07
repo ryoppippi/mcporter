@@ -30,7 +30,7 @@ vi.mock('../src/generate-cli.js', () => ({
 }));
 
 const cliModule = await import('../src/cli.js');
-const { handleInspectCli, handleRegenerateCli } = cliModule;
+const { handleGenerateCli, handleInspectCli } = cliModule;
 
 const tmpDir = path.join(os.tmpdir(), 'mcporter-cli-regenerate');
 
@@ -39,7 +39,7 @@ afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
 });
 
-describe('inspect/regenerate CLI artifacts', () => {
+describe('inspect/generate CLI artifacts', () => {
   it('prints metadata summary for inspect-cli', async () => {
     const artifactPath = await writeMetadataFixture('binary');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -52,17 +52,17 @@ describe('inspect/regenerate CLI artifacts', () => {
       .join('\n');
     expect(printed).toContain('Artifact:');
     expect(printed).toContain('Server: vercel');
-    expect(printed).toContain('mcporter regenerate-cli');
+    expect(printed).toContain('mcporter generate-cli --from');
     expect(printed).toContain('Underlying generate-cli command');
 
     logSpy.mockRestore();
   });
 
-  it('regenerates artifact using stored invocation', async () => {
+  it('replays artifacts via generate-cli --from', async () => {
     const artifactPath = await writeMetadataFixture('binary');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await handleRegenerateCli([artifactPath], {});
+    await handleGenerateCli(['--from', artifactPath], {});
 
     expect(generateCliMock).toHaveBeenCalledTimes(1);
     const invocation = generateCliMock.mock.calls[0]?.[0];
@@ -79,11 +79,11 @@ describe('inspect/regenerate CLI artifacts', () => {
     logSpy.mockRestore();
   });
 
-  it('supports dry-run regeneration without invoking generator', async () => {
+  it('supports generate-cli --from --dry-run', async () => {
     const artifactPath = await writeMetadataFixture('bundle');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await handleRegenerateCli(['--dry-run', artifactPath], {});
+    await handleGenerateCli(['--from', artifactPath, '--dry-run'], {});
 
     expect(generateCliMock).not.toHaveBeenCalled();
     const printed = logSpy.mock.calls

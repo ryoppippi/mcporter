@@ -69,8 +69,12 @@ export async function handleList(
     const reused = findServerByHttpUrl(runtime.getDefinitions(), target);
     if (reused) {
       target = reused;
-    } else if (!flags.ephemeral) {
-      flags.ephemeral = { httpUrl: target };
+    } else {
+      if (!flags.ephemeral) {
+        flags.ephemeral = { httpUrl: target };
+      } else if (!flags.ephemeral.httpUrl) {
+        flags.ephemeral.httpUrl = target;
+      }
       target = undefined;
     }
   }

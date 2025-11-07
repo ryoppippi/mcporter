@@ -223,12 +223,20 @@ export async function handleCall(
 ): Promise<void> {
   const parsed = parseCallArguments(args);
   let ephemeralSpec = parsed.ephemeral;
-  if (!ephemeralSpec && parsed.server && looksLikeHttpUrl(parsed.server)) {
-    ephemeralSpec = { httpUrl: parsed.server };
+  if (parsed.server && looksLikeHttpUrl(parsed.server)) {
+    if (!ephemeralSpec) {
+      ephemeralSpec = { httpUrl: parsed.server };
+    } else if (!ephemeralSpec.httpUrl) {
+      ephemeralSpec = { ...ephemeralSpec, httpUrl: parsed.server };
+    }
     parsed.server = undefined;
   }
-  if (!ephemeralSpec && parsed.selector && looksLikeHttpUrl(parsed.selector)) {
-    ephemeralSpec = { httpUrl: parsed.selector };
+  if (parsed.selector && looksLikeHttpUrl(parsed.selector)) {
+    if (!ephemeralSpec) {
+      ephemeralSpec = { httpUrl: parsed.selector };
+    } else if (!ephemeralSpec.httpUrl) {
+      ephemeralSpec = { ...ephemeralSpec, httpUrl: parsed.selector };
+    }
     parsed.selector = undefined;
   }
   if (ephemeralSpec && parsed.server && !looksLikeHttpUrl(parsed.server)) {

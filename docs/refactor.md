@@ -13,7 +13,7 @@ Each section lists the goal, why it matters, and the concrete steps/tests needed
 - **Next**: Consider integrating the cache into `generate-cli` if we ever reuse runtime instances there.
 
 ## 2. Unified Flag Parsing for Generator-style Commands *(Completed)*
-- **Problem**: `generate-cli`, `regenerate-cli`, and `emit-ts` each
+- **Problem**: `generate-cli`, the (now legacy) `regenerate-cli` wrapper, and `emit-ts` each
   reimplemented `--runtime`, `--timeout`, and `--include-optional` handling.
 - **What we did**:
   1. Added `extractGeneratorFlags()` in `src/cli/generate/flag-parser.ts` to

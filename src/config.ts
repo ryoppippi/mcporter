@@ -168,7 +168,7 @@ function normalizeServerEntry(name: string, raw: RawEntry, baseDir: string, sour
     command = {
       kind: 'http',
       url: new URL(httpUrl),
-      headers,
+      headers: ensureHttpAcceptHeader(headers),
     };
   } else if (stdio) {
     command = {
@@ -268,6 +268,26 @@ function buildHeaders(raw: RawEntry): Record<string, string> | undefined {
 
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
+
+function ensureHttpAcceptHeader(headers?: Record<string, string>): Record<string, string> | undefined {
+  const requiredAccept = 'application/json, text/event-stream';
+  const normalized = headers ? { ...headers } : {};
+  const acceptKey = Object.keys(normalized).find((key) => key.toLowerCase() === 'accept');
+  const currentValue = acceptKey ? normalized[acceptKey] : undefined;
+  if (!currentValue || !hasRequiredAcceptTokens(currentValue)) {
+    normalized[acceptKey ?? 'accept'] = requiredAccept;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+function hasRequiredAcceptTokens(value: string): boolean {
+  const lower = value.toLowerCase();
+  return lower.includes('application/json') && lower.includes('text/event-stream');
+}
+
+export const __configInternals = {
+  ensureHttpAcceptHeader,
+};
 
 // readExternalEntries parses imported config files (JSON or TOML) into raw entry maps.
 async function readExternalEntries(filePath: string): Promise<RawEntryMap | null> {

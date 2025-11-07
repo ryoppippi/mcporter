@@ -32,6 +32,10 @@ A quick reference for the primary `mcporter` subcommands. Each command inherits
   - `--compile <path>` – compile with Bun (implies `--runtime bun`).
   - `--timeout <ms>` / `--runtime node|bun` – shared via the generator flag
     parser so defaults stay consistent.
+  - `--from <artifact>` – reuse metadata from an existing CLI artifact (legacy
+    `regenerate-cli` behavior, must point at an existing CLI).
+  - `--dry-run` – print the resolved `mcporter generate-cli ...` command without
+    executing (requires `--from`).
 
 ## `mcporter emit-ts <server>`
 - Emits TypeScript definitions (and optionally a ready-to-use client) describing

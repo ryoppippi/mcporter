@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { CommandSpec, ServerDefinition } from '../config.js';
+import { __configInternals } from '../config.js';
 import { expandHome } from '../env.js';
 
 export interface EphemeralServerSpec {
@@ -40,7 +41,11 @@ export function resolveEphemeralServer(spec: EphemeralServerSpec): EphemeralServ
       throw new Error('HTTP endpoints require --allow-http to confirm insecure usage.');
     }
     const name = slugify(spec.name ?? inferNameFromUrl(url));
-    const command: CommandSpec = { kind: 'http', url };
+    const command: CommandSpec = {
+      kind: 'http',
+      url,
+      headers: __configInternals.ensureHttpAcceptHeader(undefined),
+    };
     const definition: ServerDefinition = {
       name,
       description: spec.description,

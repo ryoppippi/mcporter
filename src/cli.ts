@@ -15,6 +15,7 @@ import { DEBUG_HANG, dumpActiveHandles, terminateChildProcesses } from './cli/ru
 import { findServerByHttpUrl } from './cli/server-lookup.js';
 import type { CliArtifactMetadata, SerializedServerDefinition } from './cli-metadata.js';
 import { readCliMetadata } from './cli-metadata.js';
+import type { GenerateCliOptions } from './generate-cli.js';
 import { generateCli } from './generate-cli.js';
 import { parseLogLevel } from './logging.js';
 import { createRuntime } from './runtime.js';
@@ -57,11 +58,6 @@ async function main(): Promise<void> {
 
   if (command === 'inspect-cli') {
     await handleInspectCli(argv);
-    return;
-  }
-
-  if (command === 'regenerate-cli') {
-    await handleRegenerateCli(argv, globalFlags);
     return;
   }
 
@@ -180,7 +176,9 @@ interface GenerateFlags {
   compile?: boolean | string;
   runtime?: 'node' | 'bun';
   timeout: number;
-  minify: boolean;
+  minify?: boolean;
+  from?: string;
+  dryRun: boolean;
 }
 
 // parseGenerateFlags extracts generate-cli specific flags from argv.
@@ -195,13 +193,25 @@ function parseGenerateFlags(args: string[]): GenerateFlags {
   let compile: boolean | string | undefined;
   const runtime: 'node' | 'bun' | undefined = common.runtime;
   const timeout = common.timeout ?? 30_000;
-  let minify = false;
+  let minify: boolean | undefined;
+  let from: string | undefined;
+  let dryRun = false;
 
   let index = 0;
   while (index < args.length) {
     const token = args[index];
     if (!token) {
       index += 1;
+      continue;
+    }
+    if (token === '--from') {
+      from = expectValue(token, args[index + 1]);
+      args.splice(index, 2);
+      continue;
+    }
+    if (token === '--dry-run') {
+      dryRun = true;
+      args.splice(index, 1);
       continue;
     }
     if (token === '--server') {
@@ -256,6 +266,11 @@ function parseGenerateFlags(args: string[]): GenerateFlags {
       args.splice(index, 1);
       continue;
     }
+    if (token === '--no-minify') {
+      minify = false;
+      args.splice(index, 1);
+      continue;
+    }
     throw new Error(`Unknown flag '${token}' for generate-cli.`);
   }
 
@@ -270,6 +285,8 @@ function parseGenerateFlags(args: string[]): GenerateFlags {
     runtime,
     timeout,
     minify,
+    from,
+    dryRun,
   };
 }
 
@@ -282,8 +299,48 @@ function expectValue(flag: string, value: string | undefined): string {
 }
 
 // handleGenerateCli parses flags and generates the requested standalone CLI.
-async function handleGenerateCli(args: string[], globalFlags: FlagMap): Promise<void> {
+export async function handleGenerateCli(args: string[], globalFlags: FlagMap): Promise<void> {
   const parsed = parseGenerateFlags(args);
+  if (parsed.from && (parsed.command || parsed.description || parsed.name)) {
+    throw new Error('--from cannot be combined with --command/--description/--name.');
+  }
+  if (parsed.dryRun && !parsed.from) {
+    throw new Error('--dry-run currently requires --from <artifact>.');
+  }
+
+  if (parsed.from) {
+    const { metadata, request } = await resolveGenerateRequestFromArtifact(parsed, globalFlags);
+    if (parsed.dryRun) {
+      const command = buildGenerateCliCommand(
+        {
+          serverRef: request.serverRef,
+          configPath: request.configPath,
+          rootDir: request.rootDir,
+          outputPath: request.outputPath,
+          bundle: request.bundle,
+          compile: request.compile,
+          runtime: request.runtime ?? 'node',
+          timeoutMs: request.timeoutMs ?? 30_000,
+          minify: request.minify ?? false,
+        },
+        metadata.server.definition,
+        globalFlags
+      );
+      console.log('Dry run — would execute:');
+      console.log(`  ${command}`);
+      return;
+    }
+    const { outputPath, bundlePath, compilePath } = await generateCli(request);
+    if (metadata.artifact.kind === 'binary' && compilePath) {
+      console.log(`Regenerated compiled CLI at ${compilePath}`);
+    } else if (metadata.artifact.kind === 'bundle' && bundlePath) {
+      console.log(`Regenerated bundled CLI at ${bundlePath}`);
+    } else {
+      console.log(`Regenerated template at ${outputPath}`);
+    }
+    return;
+  }
+
   const inferredName = parsed.name ?? (parsed.command ? inferNameFromCommand(parsed.command) : undefined);
   const serverRef =
     parsed.server ??
@@ -308,7 +365,7 @@ async function handleGenerateCli(args: string[], globalFlags: FlagMap): Promise<
     bundle: parsed.bundle,
     timeoutMs: parsed.timeout,
     compile: parsed.compile,
-    minify: parsed.minify,
+    minify: parsed.minify ?? false,
   });
   console.log(`Generated CLI at ${outputPath}`);
   if (bundlePath) {
@@ -317,6 +374,36 @@ async function handleGenerateCli(args: string[], globalFlags: FlagMap): Promise<
   if (compilePath) {
     console.log(`Compiled executable created at ${compilePath}`);
   }
+}
+
+async function resolveGenerateRequestFromArtifact(
+  parsed: GenerateFlags,
+  globalFlags: FlagMap
+): Promise<{ metadata: CliArtifactMetadata; request: GenerateCliOptions }> {
+  if (!parsed.from) {
+    throw new Error('Missing --from artifact path.');
+  }
+  const metadata = await readCliMetadata(parsed.from);
+  const invocation = { ...metadata.invocation };
+  const serverRef =
+    parsed.server ?? invocation.serverRef ?? metadata.server.name ?? JSON.stringify(metadata.server.definition);
+  if (!serverRef) {
+    throw new Error('Unable to determine server definition from artifact; pass --server with a target name.');
+  }
+  return {
+    metadata,
+    request: {
+      serverRef,
+      configPath: globalFlags['--config'] ?? invocation.configPath,
+      rootDir: globalFlags['--root'] ?? invocation.rootDir,
+      outputPath: parsed.output ?? invocation.outputPath,
+      runtime: parsed.runtime ?? invocation.runtime,
+      bundle: parsed.bundle ?? invocation.bundle,
+      timeoutMs: parsed.timeout ?? invocation.timeoutMs,
+      compile: parsed.compile ?? invocation.compile,
+      minify: parsed.minify ?? invocation.minify ?? false,
+    },
+  };
 }
 
 interface InspectFlags {
@@ -360,105 +447,6 @@ function parseInspectFlags(args: string[]): InspectFlags {
   return { artifactPath, format };
 }
 
-interface RegenerateOverrides {
-  server?: string;
-  config?: string;
-  runtime?: 'node' | 'bun';
-  timeoutMs?: number;
-  minify?: boolean;
-  outputPath?: string;
-  bundle?: boolean | string;
-  compile?: boolean | string;
-}
-
-interface RegenerateParseResult {
-  artifactPath: string;
-  overrides: RegenerateOverrides;
-  dryRun: boolean;
-}
-
-// parseRegenerateFlags collects regenerate-cli overrides and metadata.
-function parseRegenerateFlags(args: string[]): RegenerateParseResult {
-  const overrides: RegenerateOverrides = {};
-  let dryRun = false;
-  const common = extractGeneratorFlags(args);
-  if (common.runtime) {
-    overrides.runtime = common.runtime;
-  }
-  if (common.timeout) {
-    overrides.timeoutMs = common.timeout;
-  }
-  let index = 0;
-  while (index < args.length) {
-    const token = args[index];
-    if (!token) {
-      index += 1;
-      continue;
-    }
-    if (token === '--dry-run') {
-      dryRun = true;
-      args.splice(index, 1);
-      continue;
-    }
-    if (token === '--server') {
-      overrides.server = expectValue(token, args[index + 1]);
-      args.splice(index, 2);
-      continue;
-    }
-    if (token === '--config') {
-      overrides.config = expectValue(token, args[index + 1]);
-      args.splice(index, 2);
-      continue;
-    }
-    if (token === '--minify') {
-      overrides.minify = true;
-      args.splice(index, 1);
-      continue;
-    }
-    if (token === '--no-minify') {
-      overrides.minify = false;
-      args.splice(index, 1);
-      continue;
-    }
-    if (token === '--output') {
-      overrides.outputPath = expectValue(token, args[index + 1]);
-      args.splice(index, 2);
-      continue;
-    }
-    if (token === '--bundle') {
-      const next = args[index + 1];
-      if (!next || next.startsWith('--')) {
-        overrides.bundle = true;
-        args.splice(index, 1);
-      } else {
-        overrides.bundle = next;
-        args.splice(index, 2);
-      }
-      continue;
-    }
-    if (token === '--compile') {
-      const next = args[index + 1];
-      if (!next || next.startsWith('--')) {
-        overrides.compile = true;
-        args.splice(index, 1);
-      } else {
-        overrides.compile = next;
-        args.splice(index, 2);
-      }
-      continue;
-    }
-    if (token.startsWith('--')) {
-      throw new Error(`Unknown flag '${token}' for regenerate-cli.`);
-    }
-    index += 1;
-  }
-  const artifactPath = args.shift();
-  if (!artifactPath) {
-    throw new Error('Usage: mcporter regenerate-cli <artifact> [options]');
-  }
-  return { artifactPath, overrides, dryRun };
-}
-
 // handleInspectCli loads and prints metadata about a generated CLI artifact.
 export async function handleInspectCli(args: string[]): Promise<void> {
   const parsed = parseInspectFlags(args);
@@ -492,84 +480,10 @@ export async function handleInspectCli(args: string[]): Promise<void> {
   }
   const dryRunCommand = buildGenerateCliCommand(metadata.invocation, metadata.server.definition);
   console.log('Regenerate with:');
-  console.log(`  mcporter regenerate-cli ${shellQuote(parsed.artifactPath)}`);
+  console.log(`  mcporter generate-cli --from ${shellQuote(parsed.artifactPath)}`);
   if (dryRunCommand) {
     console.log('Underlying generate-cli command:');
     console.log(`  ${dryRunCommand}`);
-  }
-}
-
-// handleRegenerateCli replays stored metadata to regenerate a CLI artifact.
-export async function handleRegenerateCli(args: string[], globalFlags: FlagMap): Promise<void> {
-  const parsed = parseRegenerateFlags(args);
-  const metadata = await readCliMetadata(parsed.artifactPath);
-  const invocation = { ...metadata.invocation };
-  if (parsed.overrides.server) {
-    invocation.serverRef = parsed.overrides.server;
-  }
-  if (!invocation.serverRef) {
-    invocation.serverRef = metadata.server.name ?? JSON.stringify(metadata.server.definition);
-  }
-  if (parsed.overrides.config) {
-    invocation.configPath = parsed.overrides.config;
-  } else if (globalFlags['--config']) {
-    invocation.configPath = globalFlags['--config'];
-  }
-  if (globalFlags['--root']) {
-    invocation.rootDir = globalFlags['--root'];
-  }
-  if (parsed.overrides.runtime) {
-    invocation.runtime = parsed.overrides.runtime;
-  }
-  if (parsed.overrides.timeoutMs !== undefined) {
-    invocation.timeoutMs = parsed.overrides.timeoutMs;
-  }
-  if (parsed.overrides.minify !== undefined) {
-    invocation.minify = parsed.overrides.minify;
-  }
-  if (parsed.overrides.outputPath !== undefined) {
-    invocation.outputPath = parsed.overrides.outputPath;
-  }
-  if (parsed.overrides.bundle !== undefined) {
-    invocation.bundle = parsed.overrides.bundle;
-  }
-  if (parsed.overrides.compile !== undefined) {
-    invocation.compile = parsed.overrides.compile;
-  }
-
-  if (!invocation.serverRef) {
-    invocation.serverRef = JSON.stringify(metadata.server.definition);
-  }
-  if (!invocation.runtime) {
-    invocation.runtime = 'node';
-  }
-  if (parsed.dryRun) {
-    const command = buildGenerateCliCommand(invocation, metadata.server.definition, globalFlags);
-    console.log('Dry run — would execute:');
-    console.log(`  ${command}`);
-    return;
-  }
-
-  const result = await generateCli({
-    serverRef: invocation.serverRef,
-    configPath: invocation.configPath,
-    rootDir: invocation.rootDir,
-    outputPath: invocation.outputPath,
-    runtime: invocation.runtime,
-    bundle: invocation.bundle,
-    timeoutMs: invocation.timeoutMs,
-    minify: invocation.minify,
-    compile: invocation.compile,
-  });
-
-  if (metadata.artifact.kind === 'binary' && result.compilePath) {
-    console.log(`Regenerated compiled CLI at ${result.compilePath}`);
-  } else if (metadata.artifact.kind === 'bundle' && result.bundlePath) {
-    console.log(`Regenerated bundled CLI at ${result.bundlePath}`);
-  } else if (metadata.artifact.kind === 'template') {
-    console.log(`Regenerated template at ${result.outputPath}`);
-  } else {
-    console.log('Regeneration completed.');
   }
 }
 
@@ -685,16 +599,6 @@ Commands:
     --raw                            Shortcut for --output raw
   auth <name>                        Complete the OAuth flow for a server without listing tools
   inspect-cli <path> [--json]        Show metadata and regeneration info for a generated CLI artifact
-  regenerate-cli <path> [options]    Re-run generate-cli using stored metadata to refresh an artifact
-    --dry-run                         Print the generate-cli command without executing
-    --server <ref>                    Override the stored server reference
-    --config <path>                   Override config path from metadata
-    --runtime node|bun                Force runtime selection when regenerating
-    --timeout <ms>                    Override schema introspection timeout
-    --minify/--no-minify              Toggle bundle minification
-    --output <path>                   Override template output path
-    --bundle [path]                   Override bundle path (omit value to auto-name)
-    --compile [path]                  Override compiled binary path (omit value to auto-name)
   generate-cli --server <ref>        Generate a standalone CLI
     --name <name>                    Supply a friendly name (otherwise inferred)
     --command <ref>                  MCP command or URL (required without --server)
@@ -702,13 +606,26 @@ Commands:
     --bundle [path]                  Create a bundled JS file (auto-named when omitted)
     --compile [path]                 Compile with Bun (implies --bundle); requires Bun
     --minify                         Minify bundled output
+    --no-minify                      Disable minification when it's enabled by defaults
     --runtime node|bun               Force runtime selection (auto-detected otherwise)
     --timeout <ms>                   Override introspection timeout (default 30000)
+    --from <artifact>                Reuse metadata from an existing CLI artifact
+    --dry-run                        Print the resolved generate-cli command without executing (requires --from)
 
 Global flags:
   --config <path>                    Path to mcporter.json (defaults to ./config/mcporter.json)
   --root <path>                      Root directory for stdio command cwd
   --log-level <debug|info|warn|error>  Adjust CLI log verbosity (defaults to warn)
+
+mcporter automatically loads servers from ./config/mcporter.json plus any imports it finds from Cursor,
+Claude Code/Desktop, Codex, and other compatible editors—so everything you've already configured is
+ready to use.
+
+Examples:
+  npx mcporter list
+  npx mcporter linear.list_issues limit:5 orderBy:updatedAt
+  npx mcporter 'https://www.shadcn.io/api/mcp.getComponents()'
+  npx mcporter generate-cli --from dist/context7.js
 `);
 }
 

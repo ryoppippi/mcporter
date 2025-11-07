@@ -268,12 +268,13 @@ npx mcporter generate-cli \
 - `--output <path>` writes the template somewhere specific.
 - `--runtime bun|node` picks the runtime for generated code (Bun required for `--compile`).
 - Add `--compile` to emit a Bun-compiled binary; MCPorter cleans up intermediate bundles when you omit `--bundle`.
+- Use `--from <artifact>` (optionally `--dry-run`) to regenerate an existing CLI using its embedded metadata.
 
 Every artifact embeds regeneration metadata (generator version, resolved server definition, invocation flags). Use:
 
 ```
 npx mcporter inspect-cli dist/context7.js     # human-readable summary
-npx mcporter regenerate-cli dist/context7.js  # replay with latest mcporter
+npx mcporter generate-cli --from dist/context7.js  # replay with latest mcporter
 ```
 
 ## Generate Typed Clients
