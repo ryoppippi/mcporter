@@ -22,6 +22,7 @@ Create an `mcporter generate-cli` command that produces a standalone CLI for a s
    - If `--server` matches a configured name (via `loadServerDefinitions`), use that server definition.
    - Otherwise, if the value looks like a file path, load a Cursor-style JSON definition from disk.
    - Otherwise, attempt to parse inline JSON/JSON5.
+   - When `--command` is a raw HTTP selector or shell command, normalize scheme-less URLs to HTTPS and split stdio commands into `command` + `args` (e.g., `npx -y chrome-devtools-mcp@latest`).
    - Validate that a definition is found; prompt on failure.
 3. **Tool Introspection**
    - Use `listTools(server, { includeSchema: true })` to inspect MCP tool schemas.
@@ -68,6 +69,9 @@ npx mcporter generate-cli \
 
 chmod +x context7
 ./context7 list-tools
+
+# Shareable "one weird trick" for chrome-devtools (no config required)
+npx mcporter generate-cli --command "npx -y chrome-devtools-mcp@latest"
 
 - `--minify` shrinks the bundled output via esbuild (output defaults to `<server>.js`).
 - `--compile [path]` implies bundling and invokes `bun build --compile` to create the native executable (Bun only). When you omit the path, the compiled binary inherits the server name.

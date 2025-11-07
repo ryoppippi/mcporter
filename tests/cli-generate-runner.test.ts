@@ -60,6 +60,15 @@ describe('generate-cli runner internals', () => {
     expect(inferred).toBe('demo-tools');
   });
 
+  it('normalizes scheme-less HTTP selectors passed to --command', () => {
+    const args = ['--command', 'shadcn.io/api/mcp.getComponents'];
+    const parsed = generateInternals.parseGenerateFlags([...args]);
+    expect(typeof parsed.command).toBe('string');
+    expect((parsed.command as string).startsWith('https://')).toBe(true);
+    const inferred = parsed.command !== undefined ? generateInternals.inferNameFromCommand(parsed.command) : undefined;
+    expect(inferred).toBe('shadcn');
+  });
+
   it('builds regenerate commands honoring global flags and invocation overrides', () => {
     const definition: SerializedServerDefinition = {
       name: 'demo',

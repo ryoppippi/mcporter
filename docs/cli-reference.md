@@ -27,6 +27,7 @@ A quick reference for the primary `mcporter` subcommands. Each command inherits
   compiling with Bun).
 - Key flags:
   - `--server <name>` (or inline JSON) – choose the server definition.
+  - `--command <url|command>` – point at an ad-hoc HTTP endpoint or a stdio command (e.g., `"npx -y chrome-devtools-mcp@latest"`); mcporter infers the name when omitted.
   - `--output <path>` – where to write the TypeScript template.
   - `--bundle <path>` – emit a bundle (Node/Bun) ready for `bun x`.
   - `--compile <path>` – compile with Bun (implies `--runtime bun`).
