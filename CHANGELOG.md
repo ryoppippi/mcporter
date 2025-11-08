@@ -5,9 +5,6 @@
 ### CLI & runtime
 - `mcporter list` now prints copy/pasteable examples for ad-hoc servers by repeating the HTTP URL (with quoting) so the commands shown under `Examples:` actually work before you persist the definition.
 
-### Docs
-- Documented the ad-hoc HTTP workflow (including the need to repeat the URL or stdio flags until the server is persisted) in `docs/adhoc.md` and clarified the matching guidance in the README.
-
 ## [0.3.5] - 2025-11-08
 
 ### Code generation
