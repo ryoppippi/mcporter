@@ -48,7 +48,7 @@ describe('list output helpers', () => {
       outputSchema: { type: 'number' },
     };
     const metadata = buildToolMetadata(tool);
-    const detail = printToolDetail(definition as any, metadata, true, true);
+    const detail = printToolDetail(definition, metadata, true, true);
     expect(detail.optionalOmitted).toBe(true);
     expect(detail.examples.length).toBeGreaterThan(0);
     logSpy.mockRestore();
@@ -75,7 +75,7 @@ describe('list output helpers', () => {
       outputSchema: { type: 'object' },
     };
     const metadata = buildToolMetadata(tool);
-    const detail = printToolDetail(adhocDefinition as any, metadata, false, true);
+    const detail = printToolDetail(adhocDefinition, metadata, false, true);
     expect(detail.examples[0]).toContain("'https://mcp.sentry.dev/mcp?agent=1.use_sentry(");
     logSpy.mockRestore();
   });

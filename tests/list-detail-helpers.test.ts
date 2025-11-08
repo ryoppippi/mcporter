@@ -118,7 +118,7 @@ describe('formatCallExpressionExample', () => {
       [baseOption({ property: 'request', required: true })],
       { callSelector: 'https://mcp.sentry.dev/mcp?agent=1', wrapExpression: true }
     );
-    expect(example).toBe("mcporter call 'https://mcp.sentry.dev/mcp?agent=1.use_sentry(request: \"value\")'");
+    expect(example).toBe('mcporter call \'https://mcp.sentry.dev/mcp?agent=1.use_sentry(request: "value")\'');
   });
 });
 
