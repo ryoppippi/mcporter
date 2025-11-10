@@ -69,7 +69,18 @@ export async function handleCall(
     parsed.selector = prepared.target;
   }
 
-  const { server, tool } = resolveCallTarget(parsed);
+  const target = resolveCallTarget(parsed, { allowMissingTool: true });
+  const server = target.server;
+  let tool = target.tool;
+  if (!server) {
+    throw new Error('Missing server name. Provide it via <server>.<tool> or --server.');
+  }
+  if (!tool) {
+    tool = await inferSingleToolName(runtime, server);
+    if (!tool) {
+      throw new Error('Missing tool name. Provide it via <server>.<tool> or --tool.');
+    }
+  }
 
   const timeoutMs = resolveCallTimeout(parsed.timeoutMs);
   const hydratedArgs = await hydratePositionalArguments(runtime, server, tool, parsed.args, parsed.positionalArgs);
@@ -94,7 +105,14 @@ export async function handleCall(
   dumpActiveHandles('after call (formatted result)');
 }
 
-function resolveCallTarget(parsed: CallArgsParseResult): { server: string; tool: string } {
+interface ResolveCallTargetOptions {
+  allowMissingTool?: boolean;
+}
+
+function resolveCallTarget(
+  parsed: CallArgsParseResult,
+  options: ResolveCallTargetOptions = {}
+): { server?: string; tool?: string } {
   const selector = parsed.selector;
   let server = parsed.server;
   let tool = parsed.tool;
@@ -105,14 +123,14 @@ function resolveCallTarget(parsed: CallArgsParseResult): { server: string; tool:
     tool = right;
   } else if (selector && !server) {
     server = selector;
-  } else if (selector && !tool) {
+  } else if (selector && !tool && selector !== server) {
     tool = selector;
   }
 
   if (!server) {
     throw new Error('Missing server name. Provide it via <server>.<tool> or --server.');
   }
-  if (!tool) {
+  if (!tool && !options.allowMissingTool) {
     throw new Error('Missing tool name. Provide it via <server>.<tool> or --tool.');
   }
 
@@ -168,6 +186,22 @@ async function hydratePositionalArguments(
 }
 
 type ToolResolution = IdentifierResolution;
+
+async function inferSingleToolName(
+  runtime: Awaited<ReturnType<typeof import('../runtime.js')['createRuntime']>>,
+  server: string
+): Promise<string | undefined> {
+  const tools = await loadToolMetadata(runtime, server, { includeSchema: false });
+  if (tools.length !== 1) {
+    return undefined;
+  }
+  const name = tools[0]?.tool.name;
+  if (!name) {
+    return undefined;
+  }
+  console.log(dimText(`[auto] ${server} exposes a single tool (${name}); using it.`));
+  return name;
+}
 
 async function invokeWithAutoCorrection(
   runtime: Awaited<ReturnType<typeof import('../runtime.js')['createRuntime']>>,

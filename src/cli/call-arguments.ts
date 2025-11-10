@@ -136,6 +136,16 @@ export function parseCallArguments(args: string[]): CallArgsParseResult {
     result.selector = positional.shift();
   }
 
+  if (
+    !result.server &&
+    result.selector &&
+    shouldPromoteSelectorToCommand(result.selector) &&
+    !result.ephemeral?.stdioCommand
+  ) {
+    result.ephemeral = { ...result.ephemeral, stdioCommand: result.selector };
+    result.selector = undefined;
+  }
+
   const nextPositional = positional[0];
   if (!result.tool && nextPositional !== undefined && !nextPositional.includes('=') && !callExpressionProvidedTool) {
     result.tool = positional.shift();
@@ -281,4 +291,21 @@ function buildCallExpressionUsageError(error: unknown): CliUsageError {
     'Tip: wrap the entire expression in single quotes so the shell preserves parentheses and commas.',
   ];
   return new CliUsageError(lines.join('\n'));
+}
+
+function shouldPromoteSelectorToCommand(selector: string): boolean {
+  const trimmed = selector.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (/\s/.test(trimmed)) {
+    return true;
+  }
+  if (/^(?:\.{1,2}\/|~\/|\/)/.test(trimmed)) {
+    return true;
+  }
+  if (/^[A-Za-z]:\\/.test(trimmed) || trimmed.startsWith('\\\\')) {
+    return true;
+  }
+  return false;
 }

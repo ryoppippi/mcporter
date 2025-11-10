@@ -3,7 +3,8 @@
 ## [Unreleased]
 
 ### CLI & runtime
-- _Nothing yet._
+- `mcporter call "<stdio command>" ...` now auto-detects ad-hoc STDIO servers, so you can skip `--stdio/--stdio-arg` entirely and just quote the command you want to run.
+- When a server exposes exactly one tool, `mcporter call` infers it automatically (and prints a dim log), letting one-tool servers like Vercel Domains run with only their arguments.
 
 ## [0.5.1] - 2025-11-10
 

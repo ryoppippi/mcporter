@@ -121,6 +121,7 @@ npx mcporter call https://mcp.linear.app/mcp.list_issues assignee=me
 npx mcporter call shadcn.io/api/mcp.getComponent component=vortex   # protocol optional; defaults to https
 npx mcporter call linear.listIssues --tool listIssues   # auto-corrects to list_issues
 npx mcporter linear.list_issues                         # shorthand: infers `call`
+VERCEL_ACCESS_TOKEN=sk_vercel_example npx mcporter call "npx -y vercel-domains-mcp" domain=answeroverflow.com  # quoted stdio cmd + single-tool inference
 ```
 
 > Tool calls understand a JavaScript-like call syntax, auto-correct near-miss tool names, and emit richer inline usage hints. See [docs/call-syntax.md](docs/call-syntax.md) for the grammar and [docs/call-heuristic.md](docs/call-heuristic.md) for the auto-correction rules.

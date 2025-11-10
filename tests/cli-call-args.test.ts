@@ -5,6 +5,14 @@ process.env.MCPORTER_DISABLE_AUTORUN = '1';
 const cliModulePromise = import('../src/cli.js');
 
 describe('CLI call argument parsing', () => {
+  it('treats quoted stdio commands as ad-hoc servers without --stdio', async () => {
+    const { parseCallArguments } = await cliModulePromise;
+    const parsed = parseCallArguments(['npx -y vercel-domains-mcp', 'domain=answeroverflow.com']);
+    expect(parsed.selector).toBeUndefined();
+    expect(parsed.ephemeral?.stdioCommand).toBe('npx -y vercel-domains-mcp');
+    expect(parsed.args).toEqual({ domain: 'answeroverflow.com' });
+  });
+
   it('falls back to default call timeout when env is empty', async () => {
     vi.stubEnv('MCPORTER_CALL_TIMEOUT', '');
     try {
