@@ -11,7 +11,7 @@ function makeTempDir(prefix: string): string {
 describe('resolveConfigPath', () => {
   const originalEnvValue = process.env.MCPORTER_CONFIG;
   let tempDirs: string[] = [];
-  let homedirSpy: ReturnType<typeof vi.spyOn> | undefined;
+  let homedirSpy: { mockRestore(): void } | undefined;
 
   afterEach(() => {
     if (originalEnvValue === undefined) {

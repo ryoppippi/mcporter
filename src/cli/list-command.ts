@@ -1,5 +1,6 @@
 import ora from 'ora';
 import type { ServerDefinition } from '../config.js';
+import { MCPORTER_VERSION } from '../runtime.js';
 import type { EphemeralServerSpec } from './adhoc-server.js';
 import { extractEphemeralServerFlags } from './ephemeral-flags.js';
 import { prepareEphemeralServerTarget } from './ephemeral-target.js';
@@ -23,7 +24,6 @@ import { dimText, extraDimText, supportsSpinner, yellowText } from './terminal.j
 import { consumeTimeoutFlag, LIST_TIMEOUT_MS, withTimeout } from './timeouts.js';
 import { loadToolMetadata } from './tool-cache.js';
 import { formatTransportSummary } from './transport-utils.js';
-import { MCPORTER_VERSION } from '../runtime.js';
 
 export function extractListFlags(args: string[]): {
   schema: boolean;
