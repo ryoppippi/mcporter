@@ -1,5 +1,5 @@
-import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
+import fs from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
 import type { ServerDefinition } from '../config.js';
