@@ -121,6 +121,7 @@ describe('mcporter composability', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('reuses a single client connection for sequential calls', async () => {
@@ -202,6 +203,40 @@ describe('mcporter composability', () => {
       }
     }
   });
+
+  it('passes the current process env to stdio transports', async () => {
+    vi.stubEnv('MCPORTER_STDIO_TEST', 'from-parent');
+    const runtime = await createRuntime({
+      servers: [
+        {
+          name: 'local',
+          command: { kind: 'stdio', command: 'node', args: ['-v'], cwd: process.cwd() },
+          source: { kind: 'local', path: '<test>' },
+        },
+      ],
+    });
+    await runtime.callTool('local', 'echo', {});
+    const instance = mocks.stdioInstances.at(-1) as { options?: { env?: Record<string, string> } };
+    expect(instance?.options?.env?.MCPORTER_STDIO_TEST).toBe('from-parent');
+  });
+
+  it('overrides inherited env vars with server-specific values', async () => {
+    vi.stubEnv('MCPORTER_STDIO_TEST', 'parent');
+    const runtime = await createRuntime({
+      servers: [
+        {
+          name: 'local',
+          command: { kind: 'stdio', command: 'node', args: ['-v'], cwd: process.cwd() },
+          env: { MCPORTER_STDIO_TEST: 'from-config', EXTRA: '42' },
+          source: { kind: 'local', path: '<test>' },
+        },
+      ],
+    });
+    await runtime.callTool('local', 'echo', {});
+    const instance = mocks.stdioInstances.at(-1) as { options?: { env?: Record<string, string> } };
+    expect(instance?.options?.env?.MCPORTER_STDIO_TEST).toBe('from-config');
+    expect(instance?.options?.env?.EXTRA).toBe('42');
+  });
 });
 
 describe('stdio transport environment', () => {
@@ -250,10 +285,12 @@ describe('stdio transport environment', () => {
       await runtime.listTools('obsidian');
       expect(mocks.stdioInstances).toHaveLength(1);
       const transport = mocks.stdioInstances[0] as { options: { env?: Record<string, string> } };
-      expect(transport.options.env).toEqual({
-        OBSIDIAN_API_KEY: 'secret',
-        OBSIDIAN_BASE_URL: 'https://127.0.0.1:27124',
-      });
+      expect(transport.options.env).toEqual(
+        expect.objectContaining({
+          OBSIDIAN_API_KEY: 'secret',
+          OBSIDIAN_BASE_URL: 'https://127.0.0.1:27124',
+        })
+      );
     } finally {
       await runtime.close().catch(() => {});
     }

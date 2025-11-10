@@ -33,7 +33,7 @@ Notice that the second command repeats the URL. Ad-hoc definitions are ephemeral
 ## Transport Detection
 
 - **HTTP(S)**: Providing a URL defaults to the streamable HTTP transport. `https://` works out of the box; `http://` requires `--allow-http` to acknowledge cleartext traffic.
-- **STDIO**: Supplying `--stdio` (with a command string) or `--stdio-bin` (binary + args) selects the stdio transport. We accept optional `--cwd` and `--env KEY=value` pairs.
+- **STDIO**: Supplying `--stdio` (with a command string) or `--stdio-bin` (binary + args) selects the stdio transport. Your current shell environment is inherited automatically; use `--env KEY=value` only when you need to inject/override specific variables (and `--cwd` to change directories).
 - **Conflict guard**: Passing both URL and stdio flags errors out so we don’t guess.
 
 ## Naming & Identity

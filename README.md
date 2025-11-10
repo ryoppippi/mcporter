@@ -139,7 +139,7 @@ Helpful flags:
 - `--json` (on `mcporter auth`) -- emit the same structured connection envelope whenever OAuth/transport setup fails, instead of throwing an error.
 - `--json` (on `mcporter emit-ts`) -- print a JSON summary describing the emitted files (mode + output paths) instead of text logs—handy when generating artifacts inside scripts.
 - `--all-parameters` -- show every schema field when listing a server (default output shows at least five parameters plus a summary of the rest).
-- `--http-url <https://…>` / `--stdio "command …"` -- describe an ad-hoc MCP server inline (pair with `--env KEY=value`, `--cwd`, `--name`, and `--persist <config.json>` as needed). These flags now work with `mcporter auth` too, so `mcporter auth https://mcp.example.com/mcp` just works.
+- `--http-url <https://…>` / `--stdio "command …"` -- describe an ad-hoc MCP server inline. STDIO transports now inherit your current shell environment automatically; add `--env KEY=value` only when you need to inject/override variables alongside `--cwd`, `--name`, or `--persist <config.json>`. These flags now work with `mcporter auth` too, so `mcporter auth https://mcp.example.com/mcp` just works.
 - For OAuth-protected servers such as `vercel`, run `npx mcporter auth vercel` once to complete login.
 
 > Tip: You can skip the verb entirely—`mcporter firecrawl` automatically runs `mcporter list firecrawl`, and dotted tokens like `mcporter linear.list_issues` dispatch to the call command (typo fixes included).

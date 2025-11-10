@@ -271,7 +271,9 @@ class McpRuntime implements Runtime {
 
     return withEnvOverrides(activeDefinition.env, async () => {
       if (activeDefinition.command.kind === 'stdio') {
-        const resolvedEnv =
+        // Resolve any ${VAR:-fallback} placeholders first so overrides remain deterministic even after
+        // we merge the caller's environment below.
+        const resolvedEnvOverrides =
           activeDefinition.env && Object.keys(activeDefinition.env).length > 0
             ? Object.fromEntries(
                 Object.entries(activeDefinition.env)
@@ -279,11 +281,17 @@ class McpRuntime implements Runtime {
                   .filter(([, value]) => value !== '')
               )
             : undefined;
+        // Clone process.env so ad-hoc STDIO commands inherit the same environment as the invoking shell,
+        // then layer config/env overrides on top (without mutating the parent process.env).
+        const mergedEnv =
+          resolvedEnvOverrides && Object.keys(resolvedEnvOverrides).length > 0
+            ? { ...process.env, ...resolvedEnvOverrides }
+            : { ...process.env };
         const transport = new StdioClientTransport({
           command: activeDefinition.command.command,
           args: activeDefinition.command.args,
           cwd: activeDefinition.command.cwd,
-          env: resolvedEnv,
+          env: mergedEnv,
         });
         await client.connect(transport);
         return { client, transport, definition: activeDefinition, oauthSession: undefined };
