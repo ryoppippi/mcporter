@@ -12,6 +12,7 @@ import {
 import { pathsForImport, readExternalEntries } from '../config-imports.js';
 import type { ServerDefinition } from '../config-schema.js';
 import { expandHome } from '../env.js';
+import { MCPORTER_VERSION } from '../runtime.js';
 import { CliUsageError } from './errors.js';
 import { chooseClosestIdentifier, renderIdentifierResolutionMessages } from './identifier-helpers.js';
 import { boldText, dimText, extraDimText, supportsAnsiColor } from './terminal.js';
@@ -671,6 +672,7 @@ async function handleLogoutCommand(options: ConfigCliOptions, args: string[]): P
 }
 
 async function handleDoctorCommand(options: ConfigCliOptions, _args: string[]): Promise<void> {
+  console.log(`MCPorter ${MCPORTER_VERSION}`);
   const servers = await loadServerDefinitions(options.loadOptions);
   const issues: string[] = [];
   for (const server of servers) {

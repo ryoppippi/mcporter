@@ -131,7 +131,10 @@ async function readConfigFile(configPath: string, explicit: boolean): Promise<Ra
     const buffer = await fs.readFile(configPath, 'utf8');
     return RawConfigSchema.parse(JSON.parse(buffer));
   } catch (error) {
-    if (!explicit && isConfigRecoverable(error)) {
+    if (!explicit && isMissingConfigError(error)) {
+      return { mcpServers: {} };
+    }
+    if (!explicit && isSyntaxError(error)) {
       warnConfigFallback(configPath, error);
       return { mcpServers: {} };
     }
@@ -143,10 +146,11 @@ function isErrno(error: unknown, code: string): error is NodeJS.ErrnoException {
   return Boolean(error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === code);
 }
 
-function isConfigRecoverable(error: unknown): boolean {
-  if (isErrno(error, 'ENOENT') || includesErrnoMessage(error, 'ENOENT')) {
-    return true;
-  }
+function isMissingConfigError(error: unknown): boolean {
+  return isErrno(error, 'ENOENT') || includesErrnoMessage(error, 'ENOENT');
+}
+
+function isSyntaxError(error: unknown): error is SyntaxError {
   return error instanceof SyntaxError;
 }
 
