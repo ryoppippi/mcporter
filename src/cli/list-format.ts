@@ -90,16 +90,30 @@ export function formatSourceSuffix(
   }
   // When verbose, show every contributing source (primary first) so duplicates are discoverable.
   const [primary, ...alternates] = sources;
-  const primaryLabel = `${formatPathForDisplay(primary.path)} (primary)`;
+  const primaryLabel = buildSourceLabel(primary, { primary: true });
   const altLabels = alternates.map((entry) => {
-    const base = formatPathForDisplay(entry.path);
-    const shadowReason = primary.kind === 'local' && entry.kind !== 'local' ? 'shadowed by local' : 'shadowed';
-    return `${base} (${shadowReason})`;
+    const shadowedByLocal = primary.kind === 'local' && entry.kind !== 'local';
+    return buildSourceLabel(entry, { shadowReason: shadowedByLocal ? 'shadowed by local' : 'shadowed' });
   });
   const label =
     altLabels.length === 0 ? `source: ${primaryLabel}` : `sources: ${[primaryLabel, ...altLabels].join(' · ')}`;
   const tinted = extraDimText(inline ? label : `[${label}]`);
   return inline ? tinted : ` ${tinted}`;
+}
+
+function buildSourceLabel(source: ServerSource, options: { primary?: boolean; shadowReason?: string }): string {
+  const base = formatPathForDisplay(source.path);
+  const tags: string[] = [];
+  if (options.primary) {
+    tags.push('primary');
+  }
+  if (options.shadowReason) {
+    tags.push(options.shadowReason);
+  }
+  if (source.importKind) {
+    tags.push(source.importKind);
+  }
+  return tags.length === 0 ? base : `${base} (${tags.join(', ')})`;
 }
 
 export function classifyListError(

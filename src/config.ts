@@ -57,7 +57,7 @@ export async function loadServerDefinitions(options: LoadConfigOptions = {}): Pr
           if (merged.has(name)) {
             continue;
           }
-          const source: ServerSource = { kind: 'import', path: resolved };
+          const source: ServerSource = { kind: 'import', path: resolved, importKind };
           const existing = merged.get(name);
           // Keep the first-seen source as canonical while tracking all alternates
           if (existing) {

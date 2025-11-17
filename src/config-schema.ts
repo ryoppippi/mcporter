@@ -96,6 +96,7 @@ export type CommandSpec = HttpCommand | StdioCommand;
 export interface ServerSource {
   readonly kind: 'local' | 'import';
   readonly path: string;
+  readonly importKind?: ImportKind;
 }
 
 export type ServerLifecycle =

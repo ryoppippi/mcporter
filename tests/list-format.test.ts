@@ -11,15 +11,15 @@ describe('list format helpers', () => {
   it('shows all sources when verbose is enabled and preserves order', () => {
     const suffix = formatSourceSuffix(
       [
-        { kind: 'import', path: '/project/config/mcporter.json' },
-        { kind: 'import', path: '/home/user/.cursor/mcp.json' },
+        { kind: 'import', path: '/project/config/mcporter.json', importKind: 'vscode' },
+        { kind: 'import', path: '/home/user/.cursor/mcp.json', importKind: 'cursor' },
       ],
       false,
       { verbose: true }
     );
     const plain = stripAnsi(suffix);
     expect(plain).toContain(
-      '[sources: /project/config/mcporter.json (primary) · /home/user/.cursor/mcp.json (shadowed)]'
+      '[sources: /project/config/mcporter.json (primary, vscode) · /home/user/.cursor/mcp.json (shadowed, cursor)]'
     );
   });
 
@@ -27,14 +27,14 @@ describe('list format helpers', () => {
     const suffix = formatSourceSuffix(
       [
         { kind: 'local', path: '/project/config/mcporter.json' },
-        { kind: 'import', path: '/home/user/.cursor/mcp.json' },
+        { kind: 'import', path: '/home/user/.cursor/mcp.json', importKind: 'cursor' },
       ],
       false,
       { verbose: true }
     );
     const plain = stripAnsi(suffix);
     expect(plain).toContain(
-      '[sources: /project/config/mcporter.json (primary) · /home/user/.cursor/mcp.json (shadowed by local)]'
+      '[sources: /project/config/mcporter.json (primary) · /home/user/.cursor/mcp.json (shadowed by local, cursor)]'
     );
   });
 });

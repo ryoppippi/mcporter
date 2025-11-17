@@ -58,8 +58,9 @@ describe('mcporter list --verbose end-to-end', () => {
     await runCli(['list', '--verbose']);
     const textOutput = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
     expect(textOutput).toContain('alpha');
-    expect(textOutput).toContain('(primary)');
-    expect(textOutput).toContain('(shadowed by local)');
+    expect(textOutput).toContain('(primary');
+    expect(textOutput).toContain('(shadowed by local');
+    expect(textOutput).toContain('cursor');
 
     logSpy.mockClear();
 
