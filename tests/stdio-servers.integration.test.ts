@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -48,6 +49,9 @@ describe('stdio MCP servers (filesystem + memory)', () => {
   let configPath: string;
   let fsRoot: string;
 
+  const filesystemServerScript = fileURLToPath(new URL('./fixtures/stdio-filesystem-server.mjs', import.meta.url));
+  const memoryServerScript = fileURLToPath(new URL('./fixtures/stdio-memory-server.mjs', import.meta.url));
+
   beforeAll(async () => {
     await ensureDistBuilt();
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcporter-stdio-e2e-'));
@@ -62,13 +66,13 @@ describe('stdio MCP servers (filesystem + memory)', () => {
           mcpServers: {
             'fs-test': {
               description: 'Filesystem MCP for stdio e2e tests',
-              command: 'npx',
-              args: ['-y', '@modelcontextprotocol/server-filesystem', fsRoot],
+              command: process.execPath,
+              args: [filesystemServerScript, fsRoot],
             },
             'memory-test': {
               description: 'Knowledge graph MCP for stdio e2e tests',
-              command: 'npx',
-              args: ['-y', '@modelcontextprotocol/server-memory'],
+              command: process.execPath,
+              args: [memoryServerScript],
             },
           },
         },
@@ -83,14 +87,12 @@ describe('stdio MCP servers (filesystem + memory)', () => {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  it(
-    'lists filesystem tools and reads files via stdio MCP',
-    async () => {
-      const listResult = await runCli(['list', 'fs-test'], configPath);
-      expect(listResult.stdout).toContain('Filesystem MCP for stdio e2e tests');
-      const callResult = await runCli(
-        [
-          'call',
+  it('lists filesystem tools and reads files via stdio MCP', async () => {
+    const listResult = await runCli(['list', 'fs-test'], configPath);
+    expect(listResult.stdout).toContain('Filesystem MCP for stdio e2e tests');
+    const callResult = await runCli(
+      [
+        'call',
         'fs-test.read_text_file',
         '--output',
         'json',
@@ -98,11 +100,9 @@ describe('stdio MCP servers (filesystem + memory)', () => {
         JSON.stringify({ path: path.join(fsRoot, 'hello.txt') }),
       ],
       configPath
-      );
-      expect(callResult.stdout).toContain('hello from stdio mcp');
-    },
-    20000
-  );
+    );
+    expect(callResult.stdout).toContain('hello from stdio mcp');
+  }, 20000);
 
   const memoryTest = process.platform === 'win32' ? it.skip : it;
 
