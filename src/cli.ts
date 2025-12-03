@@ -21,6 +21,8 @@ import { consumeOutputFormat } from './cli/output-format.js';
 import { DEBUG_HANG, dumpActiveHandles, terminateChildProcesses } from './cli/runtime-debug.js';
 import { boldText, dimText, extraDimText, supportsAnsiColor } from './cli/terminal.js';
 import { resolveConfigPath } from './config.js';
+import type { ServerDefinition } from './config-schema.js';
+import { spawn } from 'node:child_process';
 import { DaemonClient } from './daemon/client.js';
 import { createKeepAliveRuntime } from './daemon/runtime-wrapper.js';
 import { analyzeConnectionError } from './error-classifier.js';
@@ -476,6 +478,13 @@ export async function handleAuth(runtime: Awaited<ReturnType<typeof createRuntim
     logInfo(`Cleared cached credentials for '${target}'.`);
   }
 
+  if (definition.command.kind === 'stdio' && definition.oauthCommand) {
+    logInfo(`Starting auth helper for '${target}' (stdio). Leave this running until the browser flow completes.`);
+    await runStdioAuth(definition);
+    logInfo(`Auth helper for '${target}' finished. You can now call tools.`);
+    return;
+  }
+
   // Kick off the interactive OAuth flow without blocking list output. We retry once if the
   // server gets auto-promoted to OAuth mid-flight.
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -512,6 +521,28 @@ async function invokeAuthCommand(runtimeOptions: Parameters<typeof createRuntime
   } finally {
     await runtime.close().catch(() => {});
   }
+}
+
+async function runStdioAuth(definition: ServerDefinition): Promise<void> {
+  const authArgs = [...(definition.command.kind === 'stdio' ? definition.command.args ?? [] : [])];
+  if (definition.oauthCommand) {
+    authArgs.push(...definition.oauthCommand.args);
+  }
+  return new Promise((resolve, reject) => {
+    const child = spawn(definition.command.kind === 'stdio' ? definition.command.command : '', authArgs, {
+      stdio: 'inherit',
+      cwd: definition.command.kind === 'stdio' ? definition.command.cwd : process.cwd(),
+      env: process.env,
+    });
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Auth helper exited with code ${code ?? 'null'}`));
+      }
+    });
+  });
 }
 
 function shouldRetryAuthError(error: unknown): boolean {

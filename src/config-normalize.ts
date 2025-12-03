@@ -15,6 +15,8 @@ export function normalizeServerEntry(
   const tokenCacheDir = normalizePath(raw.tokenCacheDir ?? raw.token_cache_dir);
   const clientName = raw.clientName ?? raw.client_name;
   const oauthRedirectUrl = raw.oauthRedirectUrl ?? raw.oauth_redirect_url ?? undefined;
+  const oauthCommandRaw = raw.oauthCommand ?? raw.oauth_command;
+  const oauthCommand = oauthCommandRaw ? { args: [...oauthCommandRaw.args] } : undefined;
   const headers = buildHeaders(raw);
 
   const httpUrl = getUrl(raw);
@@ -42,6 +44,11 @@ export function normalizeServerEntry(
   const lifecycle = resolveLifecycle(name, raw.lifecycle, command);
   const logging = normalizeLogging(raw.logging);
 
+  const defaultedOauthCommand =
+    !oauthCommand && name.toLowerCase() === 'gmail' && command.kind === 'stdio'
+      ? { args: ['auth', 'http://localhost:3000/oauth2callback'] }
+      : oauthCommand;
+
   return {
     name,
     description,
@@ -51,6 +58,7 @@ export function normalizeServerEntry(
     tokenCacheDir,
     clientName,
     oauthRedirectUrl,
+    oauthCommand: defaultedOauthCommand,
     source,
     sources,
     lifecycle,
