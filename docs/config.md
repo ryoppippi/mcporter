@@ -1,3 +1,9 @@
+---
+summary: 'How mcporter discovers, merges, and mutates configuration files (project + home + imports), including OAuth and persistence.'
+read_when:
+  - 'Working on config resolution, imports, or mcporter config subcommands'
+---
+
 # CLI Help Menu Snapshot
 ```
 mcporter config
@@ -106,7 +112,7 @@ Use `--scope home|project` with `mcporter config add` to pick the write target e
 ### `mcporter config import <kind>`
 - Displays (and optionally copies) entries from editor-specific configs:
   - `cursor`: `.cursor/mcp.json` in the repo, falling back to `~/.config/Cursor/User/mcp.json` (or `%APPDATA%/Cursor/User` on Windows).
-  - `claude-code`: `<root>/.claude/settings.local.json`, `<root>/.claude/settings.json`, `<root>/.claude/mcp.json`, then `~/.claude/settings.json`, `~/.claude/mcp.json`, `~/.claude.json`. `settings.local.json` is meant for untracked per-developer overrides, while `settings.json` is the shared project config.citeturn0search0
+  - `claude-code`: `<root>/.claude/settings.local.json`, `<root>/.claude/settings.json`, `<root>/.claude/mcp.json`, then `~/.claude/settings.json`, `~/.claude/mcp.json`, `~/.claude.json`. `settings.local.json` is meant for untracked per-developer overrides, while `settings.json` is the shared project config.
   - `claude-desktop`: platform-specific `Claude/claude_desktop_config.json` paths.
   - `codex`: `<root>/.codex/config.toml`, then `~/.codex/config.toml`.
   - `windsurf`: Codeium’s Windsurf config under `%APPDATA%/Codeium/windsurf/mcp_config.json` or `~/.codeium/windsurf/mcp_config.json`.

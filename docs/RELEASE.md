@@ -1,3 +1,9 @@
+---
+summary: 'Release checklist for mcporter: versioning, tests, build artifacts, npm publish, GitHub release assets, and Homebrew tap updates.'
+read_when:
+  - 'Cutting a release or updating release automation'
+---
+
 # Release Checklist
 
 > **Runner note:** From the repo root run `export MCP_RUNNER="$PWD/runner"` and use `$MCP_RUNNER <command>` for every shell command listed below unless the step explicitly says otherwise. This keeps the guardrails active even when the checklist jumps between directories.

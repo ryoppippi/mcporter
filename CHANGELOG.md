@@ -7,19 +7,14 @@ No unreleased changes yet.
 ## [0.7.3] - 2025-12-29
 
 ### CLI
+- Fixed generated CLIs to read Commander.js option values via camelCased properties so snake_case tool schemas map correctly. (Thanks @rawwerks, PR #28)
 - Coerce generated CLI array arguments based on JSON Schema item types (including integer arrays). (Thanks @rawwerks, PR #27)
 - `mcporter generate-cli` supports `--include-tools` / `--exclude-tools` to generate CLIs for a subset of server tools. (Thanks @zackleman, PR #24)
 
 ### Tests
 - Added regression coverage for typed array parsing in generated CLIs.
-
-## [0.7.2] - 2025-12-29
-### CLI
-- Fixed generated CLIs to read Commander.js option values via camelCased properties so snake_case tool schemas map correctly. (Thanks @rawwerks, PR #28)
-
-### Tests
-- Added regression coverage for snake_case, camelCase, and numeric option names in generated CLIs.
-- Increased the Bun bundler integration-test timeout to reduce flakes on slower runners.
+ - Added regression coverage for snake_case, camelCase, and numeric option names in generated CLIs.
+ - Increased the Bun bundler integration-test timeout to reduce flakes on slower runners.
 
 ### Tooling / Dependencies
 - Updated dependency set (SDK, Rolldown, Zod, Biome, Oxlint, Bun types).
