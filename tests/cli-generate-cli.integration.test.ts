@@ -472,6 +472,75 @@ describe('mcporter CLI integration', () => {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }, 20000);
 
+  it('end-to-end: compiles a "ban" CLI and calls ping', async () => {
+    if (!(await ensureBunSupport('BAN CLI end-to-end test'))) {
+      return;
+    }
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcporter-cli-ban-'));
+    await fs.writeFile(
+      path.join(tempDir, 'package.json'),
+      JSON.stringify({ name: 'mcporter-ban-e2e', version: '0.0.0' }, null, 2),
+      'utf8'
+    );
+
+    const binaryPath = path.join(tempDir, 'ban');
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        process.execPath,
+        [
+          CLI_ENTRY,
+          'generate-cli',
+          '--command',
+          baseUrl.toString(),
+          '--runtime',
+          'bun',
+          '--compile',
+          binaryPath,
+          '--name',
+          'ban',
+          '--include-tools',
+          'ping',
+        ],
+        { cwd: tempDir, env: { ...process.env, MCPORTER_NO_FORCE_EXIT: '1' } },
+        (error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        }
+      );
+    });
+
+    const helpOutput = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      execFile(binaryPath, [], { env: process.env }, (error, stdout, stderr) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve({ stdout, stderr });
+      });
+    });
+    expect(helpOutput.stdout).toMatch(/Usage: ban <command> \[options]/);
+    expect(helpOutput.stdout).toContain('ping - Simple health check');
+    expect(helpOutput.stdout).not.toContain('admin-reset');
+
+    const pingOutput = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      execFile(binaryPath, ['ping', '--echo', 'works', '--output', 'json'], { env: process.env }, (error, stdout, stderr) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve({ stdout, stderr });
+      });
+    });
+    const parsed = JSON.parse(pingOutput.stdout.trim()) as { ok: boolean; echo?: string };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.echo).toBe('works');
+
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }, 30000);
+
   it('runs "node dist/cli.js generate-cli --compile" using the Bun bundler by default', async () => {
     if (!(await ensureBunSupport('Bun bundler compile integration test'))) {
       return;
