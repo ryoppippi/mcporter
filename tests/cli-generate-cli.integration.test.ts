@@ -112,7 +112,7 @@ describe('mcporter CLI integration', () => {
           resolve();
         });
       });
-  });
+  }, 60_000);
 
   afterAll(async () => {
     if (shutdown) {
